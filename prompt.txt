@@ -1,0 +1,34 @@
+Regla general para todas las tablas se deben generar funciones para agregar , modificar, borra, listar  con distintos filtros tanto por pantalla como por impresora
+Necesito una aplicacion que me permita, siendo la organizacion un club social y deportivo, llevar una tabla  de socios con los siguintes datos:
+-Numero de socio
+-Apellido
+-Nombre 
+-Documento nacional de identidad argentino
+-Fecha de nacimiento
+-Calle 
+-Numero de casa
+-Localidad
+-Provincia
+-telefono con formato para whastapp
+-email
+-Categoria de socio , se debebe crear una tabla con datos como id de categoria y nombre
+-Obrasocial 
+-numero de afiliado a obra social
+-fecha de alta como socio
+-fecha de baja como socio
+
+
+
+
+
+
+
+
+
+que deben estar categorizados segun categorias almacenadas en otra tabla
+
+
+
+
+
+https://nodejs.org/

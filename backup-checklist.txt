@@ -1,0 +1,74 @@
+CHECKPOINT - Sistema de Gestión de Socios
+==========================================
+Fecha: 2025-11-07
+Versión: 1.0.0
+
+ARCHIVOS CLAVE DEL PROYECTO
+============================
+
+Configuración:
+- package.json
+- tsconfig.json
+- vite.config.ts
+- .gitignore
+- .eslintrc.cjs
+
+Código Principal:
+- src/App.tsx
+- src/main.tsx
+- src/index.css
+- src/App.css
+
+Tipos:
+- src/types/index.ts
+
+Servicios:
+- src/services/storage.ts
+
+Hooks:
+- src/hooks/useSocios.ts
+- src/hooks/useCategorias.ts
+
+Componentes:
+- src/components/FormularioSocio.tsx
+- src/components/FormularioSocio.css
+- src/components/FormularioCategoria.tsx
+- src/components/FormularioCategoria.css
+- src/components/ListaSocios.tsx
+- src/components/ListaSocios.css
+- src/components/ListaCategorias.tsx
+- src/components/ListaCategorias.css
+- src/components/TablaSocios.tsx
+- src/components/TablaSocios.css
+- src/components/TablaCategorias.tsx
+- src/components/TablaCategorias.css
+- src/components/FiltrosSocios.tsx
+- src/components/FiltrosSocios.css
+- src/components/ImprimirSocios.tsx
+- src/components/ImprimirSocios.css
+- src/components/ImprimirCategorias.tsx
+- src/components/ImprimirCategorias.css
+- src/components/Layout.tsx
+- src/components/Layout.css
+
+Páginas:
+- src/pages/SociosPage.tsx
+- src/pages/CategoriasPage.tsx
+
+Documentación:
+- README.md
+- CHECKPOINT.md (este archivo)
+
+FUNCIONALIDADES COMPLETADAS
+===========================
+✅ CRUD completo para Socios
+✅ CRUD completo para Categorías
+✅ Filtros de búsqueda avanzados
+✅ Funcionalidad de impresión
+✅ Navegación entre secciones
+✅ Validación de formularios
+✅ Diseño responsive
+✅ Almacenamiento local
+
+ESTADO: PROYECTO COMPLETO Y FUNCIONAL
+
