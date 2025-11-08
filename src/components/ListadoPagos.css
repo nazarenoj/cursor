@@ -1,0 +1,145 @@
+.listado-pagos {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.filtros-pagos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  align-items: end;
+}
+
+.filtro {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filtro label {
+  font-size: 0.85rem;
+  color: #4a5568;
+  font-weight: 600;
+}
+
+.filtro input,
+.filtro select {
+  border: 1px solid #cbd5f5;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  color: #2d3748;
+}
+
+.btn-limpiar {
+  padding: 0.65rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background-color: #edf2f7;
+  color: #1a202c;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.btn-limpiar:hover {
+  background-color: #e2e8f0;
+  transform: translateY(-1px);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header h1 {
+  margin: 0;
+  color: #2d3748;
+}
+
+.resumen {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  color: #4a5568;
+}
+
+.resumen strong {
+  color: #1a202c;
+}
+
+.tabla-wrapper {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.tabla-pagos {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.tabla-pagos thead {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.tabla-pagos th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tabla-pagos td {
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid #edf2f7;
+  color: #2d3748;
+}
+
+.tabla-pagos tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.sin-datos {
+  text-align: center;
+  color: #718096;
+  padding: 1.5rem 0;
+}
+
+@media (max-width: 768px) {
+  .resumen {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .filtros-pagos {
+    grid-template-columns: 1fr;
+  }
+
+  .tabla-pagos {
+    font-size: 0.8rem;
+  }
+
+  .tabla-pagos th,
+  .tabla-pagos td {
+    padding: 0.6rem;
+  }
+}
+
+

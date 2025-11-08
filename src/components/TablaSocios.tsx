@@ -7,9 +7,20 @@ interface TablaSociosProps {
   categorias: Categoria[];
   onModificar: (socio: Socio) => void;
   onBorrar: (id: number) => void;
+  onVerLiquidaciones: (socio: Socio) => void;
+  onRegistrarPago: (socio: Socio) => void;
+  onExportPdf: () => void;
 }
 
-export const TablaSocios = ({ socios, categorias, onModificar, onBorrar }: TablaSociosProps) => {
+export const TablaSocios = ({
+  socios,
+  categorias,
+  onModificar,
+  onBorrar,
+  onVerLiquidaciones,
+  onRegistrarPago,
+  onExportPdf,
+}: TablaSociosProps) => {
   const getCategoriaNombre = (categoriaId: number) => {
     const categoria = categorias.find(c => c.id === categoriaId);
     return categoria?.nombre || 'Sin categoría';
@@ -35,6 +46,11 @@ export const TablaSocios = ({ socios, categorias, onModificar, onBorrar }: Tabla
   return (
     <div className="tabla-socios-container">
       <div className="tabla-wrapper">
+        <div className="tabla-acciones-superior">
+          <button className="btn-exportar" onClick={onExportPdf} title="Exportar a PDF">
+            📄 Exportar PDF
+          </button>
+        </div>
         <table className="tabla-socios">
           <thead>
             <tr>
@@ -68,6 +84,20 @@ export const TablaSocios = ({ socios, categorias, onModificar, onBorrar }: Tabla
                 </td>
                 <td>
                   <div className="acciones">
+                    <button
+                      onClick={() => onVerLiquidaciones(socio)}
+                      className="btn-accion btn-liquidaciones"
+                      title="Ver Liquidaciones"
+                    >
+                      💰
+                    </button>
+                    <button
+                      onClick={() => onRegistrarPago(socio)}
+                      className="btn-accion btn-pago"
+                      title="Registrar Pago"
+                    >
+                      💳
+                    </button>
                     <button
                       onClick={() => onModificar(socio)}
                       className="btn-accion btn-modificar"

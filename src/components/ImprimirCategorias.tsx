@@ -35,6 +35,7 @@ export const ImprimirCategorias = ({ categorias, onVolver }: ImprimirCategoriasP
             <tr>
               <th>ID</th>
               <th>Nombre</th>
+              <th>Costo Cuota</th>
             </tr>
           </thead>
           <tbody>
@@ -42,6 +43,7 @@ export const ImprimirCategorias = ({ categorias, onVolver }: ImprimirCategoriasP
               <tr key={categoria.id}>
                 <td>{categoria.id}</td>
                 <td>{categoria.nombre}</td>
+                <td>${categoria.costoCuota.toFixed(2)}</td>
               </tr>
             ))}
           </tbody>

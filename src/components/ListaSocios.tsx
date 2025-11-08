@@ -1,20 +1,32 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSocios } from '../hooks/useSocios';
 import { useCategorias } from '../hooks/useCategorias';
 import { FormularioSocio } from './FormularioSocio';
 import { FiltrosSocios } from './FiltrosSocios';
 import { TablaSocios } from './TablaSocios';
 import { ImprimirSocios } from './ImprimirSocios';
+import { LiquidacionesSocio } from './LiquidacionesSocio';
+import { exportarSociosPdf } from '../utils/exportSociosPdf';
 import type { Socio, FiltrosSocio } from '../types';
 import './ListaSocios.css';
 
 export const ListaSocios = () => {
-  const { socios, agregarSocio, modificarSocio, borrarSocio, listarSocios } = useSocios();
+  const {
+    socios,
+    agregarSocio,
+    modificarSocio,
+    borrarSocio,
+    listarSocios,
+    obtenerProximoNumeroSocio,
+  } = useSocios();
   const { categorias } = useCategorias();
+  const navigate = useNavigate();
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [socioEditando, setSocioEditando] = useState<Socio | undefined>(undefined);
   const [filtros, setFiltros] = useState<FiltrosSocio>({});
   const [mostrarImpresion, setMostrarImpresion] = useState(false);
+  const [socioLiquidaciones, setSocioLiquidaciones] = useState<Socio | undefined>(undefined);
 
   const sociosFiltrados = listarSocios(filtros);
 
@@ -35,13 +47,19 @@ export const ListaSocios = () => {
   };
 
   const handleSubmit = (socioData: Omit<Socio, 'id'>) => {
-    if (socioEditando) {
-      modificarSocio(socioEditando.id, socioData);
-    } else {
-      agregarSocio(socioData);
+    try {
+      if (socioEditando) {
+        modificarSocio(socioEditando.id, socioData);
+      } else {
+        agregarSocio(socioData);
+      }
+      setMostrarFormulario(false);
+      setSocioEditando(undefined);
+    } catch (error) {
+      const mensaje =
+        error instanceof Error ? error.message : 'Ocurrió un error al guardar el socio.';
+      alert(mensaje);
     }
-    setMostrarFormulario(false);
-    setSocioEditando(undefined);
   };
 
   const handleCancelar = () => {
@@ -52,6 +70,38 @@ export const ListaSocios = () => {
   const handleImprimir = () => {
     setMostrarImpresion(true);
   };
+
+  const handleVerLiquidaciones = (socio: Socio) => {
+    setSocioLiquidaciones(socio);
+  };
+
+  const handleVolverLiquidaciones = () => {
+    setSocioLiquidaciones(undefined);
+  };
+
+  const handleRegistrarPago = (socio: Socio) => {
+    navigate(`/pagos?socioId=${socio.id}`);
+  };
+
+  const handleExportPdf = () => {
+    try {
+      exportarSociosPdf(sociosFiltrados, categorias);
+    } catch (error) {
+      console.error(error);
+      alert('No se pudo generar el PDF. Intentá nuevamente.');
+    }
+  };
+
+  if (socioLiquidaciones) {
+    return (
+      <div className="lista-socios">
+        <LiquidacionesSocio
+          socio={socioLiquidaciones}
+          onVolver={handleVolverLiquidaciones}
+        />
+      </div>
+    );
+  }
 
   if (mostrarImpresion) {
     return (
@@ -69,6 +119,9 @@ export const ListaSocios = () => {
       <div className="lista-socios">
         <FormularioSocio
           socio={socioEditando}
+          numeroSocioSugerido={
+            socioEditando ? socioEditando.numeroSocio : obtenerProximoNumeroSocio()
+          }
           onSubmit={handleSubmit}
           onCancel={handleCancelar}
         />
@@ -105,6 +158,9 @@ export const ListaSocios = () => {
         categorias={categorias}
         onModificar={handleModificar}
         onBorrar={handleBorrar}
+        onVerLiquidaciones={handleVerLiquidaciones}
+        onRegistrarPago={handleRegistrarPago}
+        onExportPdf={handleExportPdf}
       />
     </div>
   );

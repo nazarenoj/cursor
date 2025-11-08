@@ -17,9 +17,27 @@ export const useSocios = () => {
     setLoading(false);
   };
 
+  const obtenerProximoNumeroSocio = () => {
+    if (socios.length === 0) return 1;
+    return Math.max(...socios.map((s) => s.numeroSocio)) + 1;
+  };
+
+  const existeNumeroSocio = (numero: number, excluirId?: number) => {
+    return socios.some(
+      (s) => s.numeroSocio === numero && (excluirId === undefined || s.id !== excluirId)
+    );
+  };
+
   const agregarSocio = (socio: Omit<Socio, 'id'>): Socio => {
+    const numeroSocioAsignado =
+      socio.numeroSocio && socio.numeroSocio > 0 ? socio.numeroSocio : obtenerProximoNumeroSocio();
+
+    if (existeNumeroSocio(numeroSocioAsignado)) {
+      throw new Error(`Ya existe un socio con el número ${numeroSocioAsignado}. Debe ser único.`);
+    }
+
     const nuevoId = socios.length > 0 ? Math.max(...socios.map(s => s.id)) + 1 : 1;
-    const nuevoSocio: Socio = { ...socio, id: nuevoId };
+    const nuevoSocio: Socio = { ...socio, id: nuevoId, numeroSocio: numeroSocioAsignado };
     const nuevosSocios = [...socios, nuevoSocio];
     setSocios(nuevosSocios);
     storageService.saveSocios(nuevosSocios);
@@ -29,9 +47,24 @@ export const useSocios = () => {
   const modificarSocio = (id: number, socio: Partial<Socio>): boolean => {
     const index = socios.findIndex(s => s.id === id);
     if (index === -1) return false;
-    
+
+    const numeroSocioActual =
+      socio.numeroSocio !== undefined ? socio.numeroSocio : socios[index].numeroSocio;
+
+    if (numeroSocioActual <= 0) {
+      throw new Error('El número de socio debe ser mayor a 0.');
+    }
+
+    if (existeNumeroSocio(numeroSocioActual, id)) {
+      throw new Error(`Ya existe un socio con el número ${numeroSocioActual}. Debe ser único.`);
+    }
+
     const sociosActualizados = [...socios];
-    sociosActualizados[index] = { ...sociosActualizados[index], ...socio };
+    sociosActualizados[index] = {
+      ...sociosActualizados[index],
+      ...socio,
+      numeroSocio: numeroSocioActual,
+    };
     setSocios(sociosActualizados);
     storageService.saveSocios(sociosActualizados);
     return true;
@@ -108,6 +141,7 @@ export const useSocios = () => {
     listarSocios,
     getSocioById,
     loadSocios,
+    obtenerProximoNumeroSocio,
   };
 };
 

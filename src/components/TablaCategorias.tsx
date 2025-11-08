@@ -24,6 +24,7 @@ export const TablaCategorias = ({ categorias, onModificar, onBorrar }: TablaCate
             <tr>
               <th>ID</th>
               <th>Nombre</th>
+              <th>Costo Cuota</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -32,6 +33,7 @@ export const TablaCategorias = ({ categorias, onModificar, onBorrar }: TablaCate
               <tr key={categoria.id}>
                 <td>{categoria.id}</td>
                 <td>{categoria.nombre}</td>
+                <td>${categoria.costoCuota.toFixed(2)}</td>
                 <td>
                   <div className="acciones">
                     <button

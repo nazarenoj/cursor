@@ -5,14 +5,20 @@ import './FormularioSocio.css';
 
 interface FormularioSocioProps {
   socio?: Socio;
+  numeroSocioSugerido: number;
   onSubmit: (socio: Omit<Socio, 'id'>) => void;
   onCancel: () => void;
 }
 
-export const FormularioSocio = ({ socio, onSubmit, onCancel }: FormularioSocioProps) => {
+export const FormularioSocio = ({
+  socio,
+  numeroSocioSugerido,
+  onSubmit,
+  onCancel,
+}: FormularioSocioProps) => {
   const { categorias } = useCategorias();
   const [formData, setFormData] = useState({
-    numeroSocio: socio?.numeroSocio || 0,
+    numeroSocio: socio?.numeroSocio || numeroSocioSugerido,
     apellido: socio?.apellido || '',
     nombre: socio?.nombre || '',
     dni: socio?.dni || '',
@@ -23,19 +29,49 @@ export const FormularioSocio = ({ socio, onSubmit, onCancel }: FormularioSocioPr
     provincia: socio?.provincia || '',
     telefono: socio?.telefono || '',
     email: socio?.email || '',
-    categoriaId: socio?.categoriaId || categorias[0]?.id || 0,
+    categoriaId: socio?.categoriaId || (categorias.length > 0 ? categorias[0].id : 0),
     obraSocial: socio?.obraSocial || '',
     numeroAfiliado: socio?.numeroAfiliado || '',
     fechaAlta: socio?.fechaAlta || new Date().toISOString().split('T')[0],
     fechaBaja: socio?.fechaBaja || null,
   });
 
+  // Actualizar categoriaId cuando se carguen las categorías (solo para nuevos socios)
+  useEffect(() => {
+    if (!socio && categorias.length > 0 && formData.categoriaId === 0) {
+      setFormData(prev => ({
+        ...prev,
+        categoriaId: categorias[0].id,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categorias.length, socio]);
+
+  // Actualizar número de socio sugerido cuando cambie (solo en alta)
+  useEffect(() => {
+    if (!socio) {
+      setFormData(prev => ({
+        ...prev,
+        numeroSocio: numeroSocioSugerido,
+      }));
+    }
+  }, [numeroSocioSugerido, socio]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData(prev => {
+      // Convertir a número los campos numéricos
+      if (name === 'categoriaId' || name === 'numeroSocio') {
+        return {
+          ...prev,
+          [name]: Number(value),
+        };
+      }
+      return {
+        ...prev,
+        [name]: value,
+      };
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {

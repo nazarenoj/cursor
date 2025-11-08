@@ -1,0 +1,35 @@
+<svg width="260" height="260" viewBox="0 0 260 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .circle {
+        stroke: #4a4a4a;
+        stroke-width: 6;
+        stroke-dasharray: 6 12;
+      }
+      .text {
+        font-family: 'Helvetica Neue', Arial, sans-serif;
+        font-size: 22px;
+        letter-spacing: 6px;
+        fill: #606060;
+      }
+      .center-text {
+        font-family: 'Georgia', 'Times New Roman', serif;
+        font-size: 110px;
+        fill: #b3b3b3;
+        opacity: 0.8;
+      }
+    </style>
+    <path id="topArc" d="M45 130a85 85 0 0 1 170 0" />
+    <path id="bottomArc" d="M215 130a85 85 0 0 1-170 0" />
+  </defs>
+  <circle class="circle" cx="130" cy="130" r="110" />
+  <text class="text">
+    <textPath href="#topArc" startOffset="50%" text-anchor="middle">CLUB SOCIAL</textPath>
+  </text>
+  <text class="text">
+    <textPath href="#bottomArc" startOffset="50%" text-anchor="middle">REALICÓ</textPath>
+  </text>
+  <text class="center-text" x="130" y="120" text-anchor="middle">C</text>
+  <text class="center-text" x="130" y="190" text-anchor="middle">S</text>
+</svg>
+

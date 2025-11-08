@@ -1,0 +1,315 @@
+.registrar-pagos {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.encabezado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.encabezado h1 {
+  margin: 0;
+  font-size: 1.8rem;
+  color: #2d3748;
+}
+
+.btn-volver {
+  padding: 0.6rem 1.4rem;
+  border: none;
+  border-radius: 6px;
+  background-color: #edf2f7;
+  color: #1a202c;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s;
+}
+
+.btn-volver:hover {
+  background-color: #e2e8f0;
+  transform: translateX(-2px);
+}
+
+.datos-socio {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem 1.5rem;
+  padding: 1rem;
+  border-radius: 8px;
+  background-color: #f8fafc;
+  color: #2d3748;
+}
+
+.label {
+  font-weight: 600;
+  color: #4a5568;
+  margin-right: 0.5rem;
+}
+
+.acciones-cuotas {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.btn-group {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn-secundario {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 6px;
+  background-color: #edf2f7;
+  color: #2d3748;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-secundario:hover {
+  background-color: #e2e8f0;
+}
+
+.btn-secundario:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.medio-pago {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.medio-pago .opciones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.medio-pago label {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  background-color: #f8fafc;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.medio-pago label.medio-seleccionado {
+  border-color: #667eea;
+  background-color: #e9efff;
+}
+
+.medio-pago input[type='checkbox'] {
+  accent-color: #667eea;
+  width: 18px;
+  height: 18px;
+}
+
+.montos-medios {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.medio-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background-color: #f8fafc;
+  padding: 0.6rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.medio-row input {
+  width: 140px;
+  padding: 0.4rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid #cbd5f5;
+  text-align: right;
+  font-weight: 600;
+}
+
+.tabla-wrapper {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.tabla-cuotas {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.tabla-cuotas thead {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.tabla-cuotas th {
+  padding: 0.9rem;
+  text-align: left;
+  font-weight: 600;
+}
+
+.tabla-cuotas td {
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.tabla-cuotas tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+.tabla-cuotas input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+}
+
+.sin-datos {
+  text-align: center;
+  color: #718096;
+}
+
+.mensaje {
+  background-color: #ebf8ff;
+  border-left: 4px solid #4299e1;
+  color: #2b6cb0;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+}
+
+.mensaje.error {
+  background-color: #fed7d7;
+  border-left-color: #e53e3e;
+  color: #742a2a;
+}
+
+.acciones-recibo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background-color: #f8fafc;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.btn-recibo {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-recibo:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(56, 161, 105, 0.25);
+}
+
+.recibo-nombre {
+  font-size: 0.9rem;
+  color: #4a5568;
+}
+
+.resumen-pago {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 1rem;
+  border-radius: 8px;
+  background-color: #f1f5f9;
+  color: #2d3748;
+  font-size: 1rem;
+}
+
+.alerta-diferencia {
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  background-color: #e6fffa;
+  color: #234e52;
+}
+
+.alerta-diferencia.error {
+  background-color: #fff5f5;
+  color: #742a2a;
+}
+
+.mensaje {
+  background-color: #ebf8ff;
+  border-left: 4px solid #4299e1;
+  color: #2b6cb0;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+}
+
+.acciones-finales {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-confirmar {
+  padding: 0.8rem 1.6rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-confirmar:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+}
+
+.btn-confirmar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+@media (max-width: 768px) {
+  .encabezado {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .medio-pago .opciones {
+    grid-template-columns: 1fr;
+  }
+
+  .resumen-pago {
+    flex-direction: column;
+  }
+}
+
+

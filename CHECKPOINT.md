@@ -127,3 +127,4 @@ npm run dev
 
 **Este checkpoint representa un estado funcional y completo de la aplicación.**
 
+

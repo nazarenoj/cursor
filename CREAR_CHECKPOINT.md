@@ -70,3 +70,4 @@ Ejecuta el archivo `backup.ps1` que se creará a continuación.
 **Fecha del checkpoint:** 2025-11-07
 **Versión:** 1.0.0
 
+

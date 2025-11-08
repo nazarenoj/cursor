@@ -11,10 +11,22 @@
   padding: 1rem 2rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
   flex-wrap: wrap;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
   gap: 1rem;
+}
+
+.navbar-logo img {
+  height: 68px;
+  width: auto;
+  display: block;
 }
 
 .navbar-brand h1 {
@@ -62,6 +74,12 @@
   .navbar {
     flex-direction: column;
     align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .navbar-left {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .navbar-nav {

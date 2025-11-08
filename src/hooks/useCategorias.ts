@@ -12,15 +12,24 @@ export const useCategorias = () => {
     // Inicializar con categorías por defecto si no hay ninguna
     if (data.length === 0) {
       const categoriasDefault: Categoria[] = [
-        { id: 1, nombre: 'Activo' },
-        { id: 2, nombre: 'Vitalicio' },
-        { id: 3, nombre: 'Honorario' },
-        { id: 4, nombre: 'Temporario' },
+        { id: 1, nombre: 'Activo', costoCuota: 5000 },
+        { id: 2, nombre: 'Vitalicio', costoCuota: 0 },
+        { id: 3, nombre: 'Honorario', costoCuota: 0 },
+        { id: 4, nombre: 'Temporario', costoCuota: 3000 },
       ];
       storageService.saveCategorias(categoriasDefault);
       setCategorias(categoriasDefault);
     } else {
-      setCategorias(data);
+      // Migrar categorías existentes que no tengan costoCuota
+      const categoriasMigradas = data.map(cat => ({
+        ...cat,
+        costoCuota: cat.costoCuota ?? 0
+      }));
+      // Solo guardar si hubo cambios
+      if (categoriasMigradas.some((cat, i) => cat.costoCuota !== data[i]?.costoCuota)) {
+        storageService.saveCategorias(categoriasMigradas);
+      }
+      setCategorias(categoriasMigradas);
     }
     setLoading(false);
   }, []);

@@ -1,0 +1,168 @@
+.liquidaciones-socio {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.liquidaciones-header {
+  margin-bottom: 2rem;
+}
+
+.btn-volver {
+  padding: 0.5rem 1rem;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.btn-volver:hover {
+  background-color: #e0e0e0;
+}
+
+.liquidaciones-header h1 {
+  color: #333;
+  font-size: 2rem;
+  margin: 0.5rem 0;
+}
+
+.socio-info {
+  color: #666;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.sin-liquidaciones {
+  background: white;
+  border-radius: 8px;
+  padding: 3rem;
+  text-align: center;
+  color: #666;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sin-liquidaciones .subtitulo {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #999;
+}
+
+.resumen-liquidaciones-socio {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  color: white;
+}
+
+.resumen-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.resumen-label {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.resumen-valor {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.resumen-valor.pagado {
+  color: #c6f6d5;
+}
+
+.resumen-valor.pendiente {
+  color: #fed7d7;
+}
+
+.tabla-wrapper {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  overflow-x: auto;
+}
+
+.tabla-liquidaciones-socio {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.tabla-liquidaciones-socio thead {
+  background-color: #f5f5f5;
+}
+
+.tabla-liquidaciones-socio th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #ddd;
+  white-space: nowrap;
+}
+
+.tabla-liquidaciones-socio td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.tabla-liquidaciones-socio tbody tr:hover {
+  background-color: #f9f9f9;
+}
+
+.tabla-liquidaciones-socio tbody tr.pagado {
+  background-color: #f0fdf4;
+  opacity: 0.9;
+}
+
+.monto {
+  font-weight: 600;
+  color: #667eea;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.badge-pagado {
+  background-color: #c6f6d5;
+  color: #22543d;
+}
+
+.badge-pendiente {
+  background-color: #fed7d7;
+  color: #742a2a;
+}
+
+@media (max-width: 768px) {
+  .resumen-liquidaciones-socio {
+    grid-template-columns: 1fr;
+  }
+
+  .tabla-liquidaciones-socio {
+    font-size: 0.8rem;
+  }
+  
+  .tabla-liquidaciones-socio th,
+  .tabla-liquidaciones-socio td {
+    padding: 0.5rem;
+  }
+}
+
+
