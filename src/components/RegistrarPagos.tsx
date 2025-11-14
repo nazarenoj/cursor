@@ -71,9 +71,9 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
   }, [totalSeleccionado, sumaMediosSeleccionados]);
 
   const ajustarDistribucion = (items: MedioSeleccion[], total: number): MedioSeleccion[] => {
-    const lista =
+    const lista: MedioSeleccion[] =
       items.length === 0
-        ? [{ medio: 'Efectivo', monto: 0, editado: false }]
+        ? [{ medio: 'Efectivo' as MedioPago, monto: 0, editado: false }]
         : items.map((item) => ({
             ...item,
             monto: Number.isFinite(item.monto) ? Number(item.monto) : 0,
@@ -84,9 +84,9 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
       .reduce((sum, item) => sum + item.monto, 0);
 
     const autoItems = lista.filter((item) => !item.editado);
-    const resultado = lista.map((item) => ({ ...item }));
+    const resultado: MedioSeleccion[] = lista.map((item) => ({ ...item }));
 
-    let restante = Number((total - manualSum).toFixed(2));
+    const restante = Number((total - manualSum).toFixed(2));
 
     if (autoItems.length === 0) {
       return resultado;
@@ -195,9 +195,9 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
     );
   };
 
-  const handleConfirmarPago = () => {
+  const handleConfirmarPago = async () => {
     if (cuotasSeleccionadas.size === 0) {
-      setAlerta({ tipo: 'error', texto: 'Seleccioná al menos una cuota para registrar el pago.' });
+          setAlerta({ tipo: 'error', texto: 'Seleccioná al menos una cuota para registrar el cobro.' });
       return;
     }
 
@@ -209,13 +209,13 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
     if (Math.abs(diferenciaMontos) > 0.5) {
       setAlerta({
         tipo: 'error',
-        texto: 'Los montos por medio de pago no coinciden con el total a pagar.',
+        texto: 'Los montos por medio de cobro no coinciden con el total a cobrar.',
       });
       return;
     }
 
     const confirmar = window.confirm(
-      `¿Confirmás registrar el pago de ${cuotasSeleccionadas.size} cuota(s) por un total de $${totalSeleccionado.toFixed(
+      `¿Confirmás registrar el cobro de ${cuotasSeleccionadas.size} cuota(s) por un total de $${totalSeleccionado.toFixed(
         2,
       )}?`,
     );
@@ -227,30 +227,46 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
       .map((item) => `${item.medio}: $${item.monto.toFixed(2)}`)
       .join(', ');
 
-    const ok = marcarCuotasComoPagadas(ids, descripcionMedios);
+    try {
+      const cuotasActualizadas = await marcarCuotasComoPagadas(ids, descripcionMedios);
 
-    if (ok) {
-      const reciboGenerado = generarRecibo({
-        socio,
-        medios: descripcionMedios,
-        cuotas: cuotasPendientes.filter((cuota) => ids.includes(cuota.id)),
-        total: totalSeleccionado,
-      });
-      if (reciboGenerado) {
-        setUltimoRecibo(reciboGenerado);
-        window.open(reciboGenerado.url, '_blank');
+      if (cuotasActualizadas.length === 0) {
+        setAlerta({
+          tipo: 'error',
+          texto: 'No se pudo registrar el cobro. Intentá nuevamente.',
+        });
+        return;
       }
 
-      setAlerta({ tipo: 'info', texto: 'El pago se registró correctamente.' });
+      if (socio) {
+        const reciboGenerado = generarRecibo({
+          socio,
+          medios: descripcionMedios,
+          cuotas: cuotasPendientes.filter((cuota) => ids.includes(cuota.id)),
+          total: totalSeleccionado,
+        });
+        if (reciboGenerado) {
+          setUltimoRecibo({
+            url: reciboGenerado.url,
+            nombre: reciboGenerado.nombre,
+          });
+          window.open(reciboGenerado.url, '_blank');
+        }
+      }
+
+      setAlerta({ tipo: 'info', texto: 'El cobro se registró correctamente.' });
       setCuotasSeleccionadas(new Set());
       setMediosSeleccionados([{ medio: 'Efectivo', monto: 0, editado: false }]);
-    setTimeout(() => {
-      navigate('/socios');
-    }, 1200);
-    } else {
+      setTimeout(() => {
+        navigate('/socios');
+      }, 1200);
+    } catch (error) {
       setAlerta({
         tipo: 'error',
-        texto: 'No se pudo registrar el pago. Intentá nuevamente.',
+        texto:
+          error instanceof Error
+            ? error.message
+            : 'No se pudo registrar el cobro. Intentá nuevamente.',
       });
     }
   };
@@ -259,8 +275,8 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
     return (
       <div className="registrar-pagos">
         <div className="card">
-          <h1>Registrar Pago de Cuotas</h1>
-          <p>Seleccioná un socio desde el listado para registrar pagos.</p>
+          <h1>Registrar Cobro de Cuotas</h1>
+          <p>Seleccioná un socio desde el listado para registrar cobros.</p>
           <button className="btn-volver" onClick={() => navigate('/socios')}>
             ← Volver al listado de socios
           </button>
@@ -272,12 +288,12 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
   return (
     <div className="registrar-pagos">
       <div className="card">
-        <div className="encabezado">
-          <button className="btn-volver" onClick={() => navigate('/socios')}>
-            ← Volver al listado de socios
-          </button>
-          <h1>Registrar Pago</h1>
-        </div>
+            <div className="encabezado">
+              <button className="btn-volver" onClick={() => navigate('/socios')}>
+                ← Volver al listado de socios
+              </button>
+              <h1>Registrar Cobro</h1>
+            </div>
 
         <div className="datos-socio">
           <div>
@@ -393,7 +409,7 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
             <span className="label">Cuotas seleccionadas:</span> {cuotasSeleccionadas.size}
           </div>
           <div>
-            <span className="label">Total a pagar:</span> ${totalSeleccionado.toFixed(2)}
+            <span className="label">Total a cobrar:</span> ${totalSeleccionado.toFixed(2)}
           </div>
           <div>
             <span className="label">Total distribuido:</span> ${sumaMediosSeleccionados.toFixed(2)}
@@ -425,7 +441,7 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
             onClick={handleConfirmarPago}
             disabled={cuotasSeleccionadas.size === 0 || Math.abs(diferenciaMontos) > 0.5}
           >
-            Confirmar pago
+                Confirmar cobro
           </button>
         </div>
       </div>
@@ -465,7 +481,7 @@ const generarRecibo = ({ socio, medios, cuotas, total }: GenerarReciboParams) =>
   doc.text(`Número de socio: ${socio.numeroSocio}`, 20, 71);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Medios de pago:', 20, 83);
+      doc.text('Medios de cobro:', 20, 83);
   doc.setFont('helvetica', 'normal');
   doc.text(medios, 20, 90, { maxWidth: 170 });
 
@@ -509,33 +525,89 @@ const generarRecibo = ({ socio, medios, cuotas, total }: GenerarReciboParams) =>
   const filename = `Recibo-${socio.numeroSocio}-${Date.now()}.pdf`;
   doc.save(filename);
 
-  const blobUrl = doc.output('bloburl');
-  return { url: blobUrl, nombre: filename };
+  const blobUrl = doc.output('bloburl') as string | URL;
+  const urlString = typeof blobUrl === 'string' ? blobUrl : blobUrl.toString();
+  return { url: urlString, nombre: filename };
 };
 
 const dibujarEncabezadoConLogo = (doc: jsPDF) => {
-  doc.setFillColor(245, 245, 245);
+  // Fondo beige claro
+  doc.setFillColor(250, 248, 245);
   doc.rect(0, 0, 210, 40, 'F');
 
-  // Logo estilizado (círculo punteado y texto)
-  doc.setDrawColor(102, 126, 234);
-  doc.setLineWidth(1);
-  doc.setLineDash([1.5, 3], 0);
-  doc.circle(30, 22, 14);
-  doc.setLineDash();
+  // Posición del logo
+  const logoX = 30;
+  const logoY = 22;
+  const logoRadius = 14;
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(102, 126, 234);
-  doc.text('CS', 30, 26, { align: 'center' });
+  // Dibujar círculo punteado (borde con puntos cuadrados)
+  doc.setDrawColor(60, 60, 60); // Gris oscuro
+  doc.setLineWidth(0.5);
+  
+  // Dibujar puntos alrededor del círculo para simular borde punteado
+  const numPoints = 40;
+  const angleStep = (2 * Math.PI) / numPoints;
+  for (let i = 0; i < numPoints; i++) {
+    const angle = i * angleStep;
+    const x = logoX + Math.cos(angle) * logoRadius;
+    const y = logoY + Math.sin(angle) * logoRadius;
+    // Dibujar punto cuadrado pequeño
+    doc.setFillColor(60, 60, 60);
+    doc.rect(x - 0.3, y - 0.3, 0.6, 0.6, 'F');
+  }
 
+  // Texto "CLUB SOCIAL" en arco superior
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(60, 60, 60); // Gris oscuro
+  
+  const topText = 'CLUB SOCIAL';
+  const topRadius = logoRadius - 2;
+  const topStartAngle = Math.PI * 0.35; // Ajuste para posición superior
+  const topAngleStep = (Math.PI * 0.9) / (topText.length - 1);
+  
+  for (let i = 0; i < topText.length; i++) {
+    const angle = topStartAngle + (i * topAngleStep);
+    const x = logoX + Math.cos(angle) * topRadius;
+    const y = logoY + Math.sin(angle) * topRadius;
+    doc.text(topText[i], x, y, { align: 'center', angle: (angle * 180 / Math.PI) - 90 });
+  }
+
+  // Texto "REALICÓ" en arco inferior (ligeramente itálico)
+  const bottomText = 'REALICÓ';
+  const bottomRadius = logoRadius - 2;
+  const bottomStartAngle = Math.PI * 1.15; // Ajuste para posición inferior
+  const bottomAngleStep = (Math.PI * 0.9) / (bottomText.length - 1);
+  
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(7);
+  
+  for (let i = 0; i < bottomText.length; i++) {
+    const angle = bottomStartAngle + (i * bottomAngleStep);
+    const x = logoX + Math.cos(angle) * bottomRadius;
+    const y = logoY + Math.sin(angle) * bottomRadius;
+    doc.text(bottomText[i], x, y, { align: 'center', angle: (angle * 180 / Math.PI) - 90 });
+  }
+
+  // Letras "C" y "S" superpuestas en el centro (fuente serif, gris medio)
+  doc.setFont('times', 'bold'); // Fuente serif
+  doc.setFontSize(20);
+  doc.setTextColor(120, 120, 120); // Gris medio
+  
+  // Letra "C" (ligeramente arriba y a la izquierda)
+  doc.text('C', logoX - 3, logoY + 2, { align: 'center' });
+  
+  // Letra "S" (ligeramente abajo y a la derecha, superpuesta)
+  doc.text('S', logoX + 3, logoY - 2, { align: 'center' });
+
+  // Título del club a la derecha del logo
   doc.setTextColor(45, 55, 72);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.text('CLUB SOCIAL REALICÓ', 105, 20, { align: 'center' });
+  doc.setFontSize(14);
+  doc.text('CLUB SOCIAL REALICÓ', 70, 20);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
-  doc.text('Recibo oficial de pago de cuotas sociales', 105, 30, { align: 'center' });
+  doc.text('Recibo oficial de cobro de cuotas sociales', 70, 30);
 };
 
 

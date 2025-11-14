@@ -51,8 +51,6 @@ export const LiquidacionesSocio = ({ socio, onVolver }: LiquidacionesSocioProps)
   const totalPagado = liquidaciones.filter(l => l.pagado).reduce((sum, l) => sum + l.monto, 0);
   const totalPendiente = totalMonto - totalPagado;
   const cantidadPagadas = liquidaciones.filter(l => l.pagado).length;
-  const cantidadPendientes = liquidaciones.length - cantidadPagadas;
-
   return (
     <div className="liquidaciones-socio">
       <div className="liquidaciones-header">
@@ -78,7 +76,7 @@ export const LiquidacionesSocio = ({ socio, onVolver }: LiquidacionesSocioProps)
               <span className="resumen-valor">${totalMonto.toFixed(2)}</span>
             </div>
             <div className="resumen-item">
-              <span className="resumen-label">Total Pagado:</span>
+              <span className="resumen-label">Total Cobrado:</span>
               <span className="resumen-valor pagado">${totalPagado.toFixed(2)}</span>
             </div>
             <div className="resumen-item">

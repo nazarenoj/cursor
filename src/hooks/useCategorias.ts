@@ -1,73 +1,51 @@
 import { useState, useEffect } from 'react';
-import { storageService } from '../services/storage';
+import { apiService } from '../services/api';
 import type { Categoria } from '../types';
 
 export const useCategorias = () => {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    const data = storageService.getCategorias();
-    // Inicializar con categorías por defecto si no hay ninguna
-    if (data.length === 0) {
-      const categoriasDefault: Categoria[] = [
-        { id: 1, nombre: 'Activo', costoCuota: 5000 },
-        { id: 2, nombre: 'Vitalicio', costoCuota: 0 },
-        { id: 3, nombre: 'Honorario', costoCuota: 0 },
-        { id: 4, nombre: 'Temporario', costoCuota: 3000 },
-      ];
-      storageService.saveCategorias(categoriasDefault);
-      setCategorias(categoriasDefault);
-    } else {
-      // Migrar categorías existentes que no tengan costoCuota
-      const categoriasMigradas = data.map(cat => ({
-        ...cat,
-        costoCuota: cat.costoCuota ?? 0
-      }));
-      // Solo guardar si hubo cambios
-      if (categoriasMigradas.some((cat, i) => cat.costoCuota !== data[i]?.costoCuota)) {
-        storageService.saveCategorias(categoriasMigradas);
-      }
-      setCategorias(categoriasMigradas);
-    }
-    setLoading(false);
+    loadCategorias();
   }, []);
 
-  const loadCategorias = () => {
+  const loadCategorias = async () => {
     setLoading(true);
-    const data = storageService.getCategorias();
-    setCategorias(data);
-    setLoading(false);
+    setError(null);
+    try {
+      const data = await apiService.getCategorias();
+      setCategorias(data);
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : 'Error al cargar las categorías.';
+      setError(mensaje);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const agregarCategoria = (categoria: Omit<Categoria, 'id'>): Categoria => {
-    const nuevoId = categorias.length > 0 ? Math.max(...categorias.map(c => c.id)) + 1 : 1;
-    const nuevaCategoria: Categoria = { ...categoria, id: nuevoId };
-    const nuevasCategorias = [...categorias, nuevaCategoria];
-    setCategorias(nuevasCategorias);
-    storageService.saveCategorias(nuevasCategorias);
-    return nuevaCategoria;
+  const agregarCategoria = async (categoria: Omit<Categoria, 'id'>): Promise<Categoria> => {
+    const creada = await apiService.crearCategoria(categoria);
+    setCategorias(prev => [...prev, creada]);
+    return creada;
   };
 
-  const modificarCategoria = (id: number, categoria: Partial<Categoria>): boolean => {
-    const index = categorias.findIndex(c => c.id === id);
-    if (index === -1) return false;
-    
-    const categoriasActualizadas = [...categorias];
-    categoriasActualizadas[index] = { ...categoriasActualizadas[index], ...categoria };
-    setCategorias(categoriasActualizadas);
-    storageService.saveCategorias(categoriasActualizadas);
-    return true;
+  const modificarCategoria = async (
+    id: number,
+    categoria: Omit<Categoria, 'id'>,
+  ): Promise<Categoria> => {
+    const actualizada = await apiService.actualizarCategoria(id, categoria);
+    setCategorias(prev =>
+      prev.map(cat => (cat.id === id ? actualizada : cat)),
+    );
+    return actualizada;
   };
 
-  const borrarCategoria = (id: number): boolean => {
-    const categoriasFiltradas = categorias.filter(c => c.id !== id);
-    if (categoriasFiltradas.length === categorias.length) return false;
-    
-    setCategorias(categoriasFiltradas);
-    storageService.saveCategorias(categoriasFiltradas);
-    return true;
+  const borrarCategoria = async (id: number): Promise<void> => {
+    await apiService.eliminarCategoria(id);
+    setCategorias(prev => prev.filter(c => c.id !== id));
   };
 
   const listarCategorias = (): Categoria[] => {
@@ -81,6 +59,7 @@ export const useCategorias = () => {
   return {
     categorias,
     loading,
+    error,
     agregarCategoria,
     modificarCategoria,
     borrarCategoria,

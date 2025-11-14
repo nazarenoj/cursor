@@ -1,82 +1,53 @@
-import { useState, useEffect } from 'react';
-import { storageService } from '../services/storage';
+import { useState, useEffect, useCallback } from 'react';
+import { apiService } from '../services/api';
 import type { Socio, FiltrosSocio } from '../types';
 
 export const useSocios = () => {
   const [socios, setSocios] = useState<Socio[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadSocios();
+  const loadSocios = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiService.getSocios();
+      setSocios(data);
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : 'Error al cargar los socios.';
+      setError(mensaje);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const loadSocios = () => {
-    setLoading(true);
-    const data = storageService.getSocios();
-    setSocios(data);
-    setLoading(false);
-  };
+  useEffect(() => {
+    loadSocios().catch(() => {
+      // El error ya fue registrado en el estado
+    });
+  }, [loadSocios]);
 
   const obtenerProximoNumeroSocio = () => {
     if (socios.length === 0) return 1;
     return Math.max(...socios.map((s) => s.numeroSocio)) + 1;
   };
 
-  const existeNumeroSocio = (numero: number, excluirId?: number) => {
-    return socios.some(
-      (s) => s.numeroSocio === numero && (excluirId === undefined || s.id !== excluirId)
-    );
+  const agregarSocio = async (socio: Omit<Socio, 'id'>): Promise<Socio> => {
+    const creado = await apiService.crearSocio(socio);
+    setSocios(prev => [...prev, creado]);
+    return creado;
   };
 
-  const agregarSocio = (socio: Omit<Socio, 'id'>): Socio => {
-    const numeroSocioAsignado =
-      socio.numeroSocio && socio.numeroSocio > 0 ? socio.numeroSocio : obtenerProximoNumeroSocio();
-
-    if (existeNumeroSocio(numeroSocioAsignado)) {
-      throw new Error(`Ya existe un socio con el número ${numeroSocioAsignado}. Debe ser único.`);
-    }
-
-    const nuevoId = socios.length > 0 ? Math.max(...socios.map(s => s.id)) + 1 : 1;
-    const nuevoSocio: Socio = { ...socio, id: nuevoId, numeroSocio: numeroSocioAsignado };
-    const nuevosSocios = [...socios, nuevoSocio];
-    setSocios(nuevosSocios);
-    storageService.saveSocios(nuevosSocios);
-    return nuevoSocio;
+  const modificarSocio = async (id: number, socio: Omit<Socio, 'id'>): Promise<Socio> => {
+    const actualizado = await apiService.actualizarSocio(id, socio);
+    setSocios(prev => prev.map(item => (item.id === id ? actualizado : item)));
+    return actualizado;
   };
 
-  const modificarSocio = (id: number, socio: Partial<Socio>): boolean => {
-    const index = socios.findIndex(s => s.id === id);
-    if (index === -1) return false;
-
-    const numeroSocioActual =
-      socio.numeroSocio !== undefined ? socio.numeroSocio : socios[index].numeroSocio;
-
-    if (numeroSocioActual <= 0) {
-      throw new Error('El número de socio debe ser mayor a 0.');
-    }
-
-    if (existeNumeroSocio(numeroSocioActual, id)) {
-      throw new Error(`Ya existe un socio con el número ${numeroSocioActual}. Debe ser único.`);
-    }
-
-    const sociosActualizados = [...socios];
-    sociosActualizados[index] = {
-      ...sociosActualizados[index],
-      ...socio,
-      numeroSocio: numeroSocioActual,
-    };
-    setSocios(sociosActualizados);
-    storageService.saveSocios(sociosActualizados);
-    return true;
-  };
-
-  const borrarSocio = (id: number): boolean => {
-    const sociosFiltrados = socios.filter(s => s.id !== id);
-    if (sociosFiltrados.length === socios.length) return false;
-    
-    setSocios(sociosFiltrados);
-    storageService.saveSocios(sociosFiltrados);
-    return true;
+  const borrarSocio = async (id: number): Promise<void> => {
+    await apiService.eliminarSocio(id);
+    setSocios(prev => prev.filter(s => s.id !== id));
   };
 
   const listarSocios = (filtros?: FiltrosSocio): Socio[] => {
@@ -135,6 +106,7 @@ export const useSocios = () => {
   return {
     socios,
     loading,
+    error,
     agregarSocio,
     modificarSocio,
     borrarSocio,

@@ -19,6 +19,8 @@ export const ListaSocios = () => {
     borrarSocio,
     listarSocios,
     obtenerProximoNumeroSocio,
+    loading,
+    error,
   } = useSocios();
   const { categorias } = useCategorias();
   const navigate = useNavigate();
@@ -40,18 +42,24 @@ export const ListaSocios = () => {
     setMostrarFormulario(true);
   };
 
-  const handleBorrar = (id: number) => {
+  const handleBorrar = async (id: number) => {
     if (window.confirm('¿Está seguro que desea eliminar este socio?')) {
-      borrarSocio(id);
+      try {
+        await borrarSocio(id);
+      } catch (error) {
+        const mensaje =
+          error instanceof Error ? error.message : 'Ocurrió un error al borrar el socio.';
+        alert(mensaje);
+      }
     }
   };
 
-  const handleSubmit = (socioData: Omit<Socio, 'id'>) => {
+  const handleSubmit = async (socioData: Omit<Socio, 'id'>) => {
     try {
       if (socioEditando) {
-        modificarSocio(socioEditando.id, socioData);
+        await modificarSocio(socioEditando.id, socioData);
       } else {
-        agregarSocio(socioData);
+        await agregarSocio(socioData);
       }
       setMostrarFormulario(false);
       setSocioEditando(undefined);
@@ -114,6 +122,22 @@ export const ListaSocios = () => {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="lista-socios">
+        <p>Cargando socios...</p>
+      </div>
+    );
+  }
+
+  if (error && socios.length === 0 && !mostrarFormulario && !mostrarImpresion) {
+    return (
+      <div className="lista-socios">
+        <p className="mensaje-error">{error}</p>
+      </div>
+    );
+  }
+
   if (mostrarFormulario) {
     return (
       <div className="lista-socios">
@@ -137,9 +161,9 @@ export const ListaSocios = () => {
           <button onClick={handleAgregar} className="btn-agregar">
             + Agregar Socio
           </button>
-          <button onClick={handleImprimir} className="btn-imprimir">
-            🖨️ Imprimir
-          </button>
+              <button onClick={handleImprimir} className="btn-imprimir">
+                📄 Exportar PDF
+              </button>
         </div>
       </div>
 

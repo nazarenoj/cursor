@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import { usePermissions } from '../contexts/PermissionsContext';
 import type { Socio, Categoria } from '../types';
 import './TablaSocios.css';
 
@@ -21,6 +22,7 @@ export const TablaSocios = ({
   onRegistrarPago,
   onExportPdf,
 }: TablaSociosProps) => {
+  const { tienePermiso } = usePermissions();
   const getCategoriaNombre = (categoriaId: number) => {
     const categoria = categorias.find(c => c.id === categoriaId);
     return categoria?.nombre || 'Sin categoría';
@@ -91,13 +93,15 @@ export const TablaSocios = ({
                     >
                       💰
                     </button>
-                    <button
-                      onClick={() => onRegistrarPago(socio)}
-                      className="btn-accion btn-pago"
-                      title="Registrar Pago"
-                    >
-                      💳
-                    </button>
+                    {tienePermiso('pagos') && (
+                      <button
+                        onClick={() => onRegistrarPago(socio)}
+                        className="btn-accion btn-pago"
+                        title="Registrar Cobro"
+                      >
+                        💳
+                      </button>
+                    )}
                     <button
                       onClick={() => onModificar(socio)}
                       className="btn-accion btn-modificar"

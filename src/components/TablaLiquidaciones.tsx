@@ -51,7 +51,7 @@ export const TablaLiquidaciones = ({
           <span className="resumen-valor">${totalMonto.toFixed(2)}</span>
         </div>
         <div className="resumen-item">
-          <span className="resumen-label">Total Pagado:</span>
+          <span className="resumen-label">Total Cobrado:</span>
           <span className="resumen-valor pagado">${totalPagado.toFixed(2)}</span>
         </div>
         <div className="resumen-item">

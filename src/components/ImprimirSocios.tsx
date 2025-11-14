@@ -1,4 +1,7 @@
 import { format } from 'date-fns';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { dibujarEncabezadoConLogo } from '../utils/pdfLogo';
 import type { Socio, Categoria, FiltrosSocio } from '../types';
 import './ImprimirSocios.css';
 
@@ -24,8 +27,87 @@ export const ImprimirSocios = ({ socios, categorias, filtros, onVolver }: Imprim
     }
   };
 
-  const handleImprimir = () => {
-    window.print();
+  const handleExportarPdf = () => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const fecha = new Date().toLocaleString('es-AR');
+
+    // Encabezado con logo
+    dibujarEncabezadoConLogo(doc, 'landscape');
+
+    // Información del documento
+    doc.setTextColor(45, 55, 72);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.text(`Fecha de generación: ${fecha}`, 14, 38);
+    doc.text(`Filtros aplicados: ${getFiltrosTexto()}`, 14, 45);
+    doc.text(`Total de socios: ${socios.length}`, 14, 52);
+
+    // Tabla
+    autoTable(doc, {
+      startY: 60,
+      headStyles: {
+        fillColor: [102, 126, 234],
+        textColor: 255,
+        fontSize: 9,
+      },
+      bodyStyles: {
+        textColor: 45,
+        fontSize: 8,
+      },
+      head: [[
+        'N° Socio',
+        'Apellido',
+        'Nombre',
+        'DNI',
+        'Fecha Nac.',
+        'Dirección',
+        'Localidad',
+        'Provincia',
+        'Teléfono',
+        'Email',
+        'Categoría',
+        'Obra Social',
+        'N° Afiliado',
+        'Fecha Alta',
+        'Fecha Baja',
+        'Estado',
+      ]],
+      body: socios.map((socio) => [
+        socio.numeroSocio.toString(),
+        socio.apellido,
+        socio.nombre,
+        socio.dni,
+        formatFecha(socio.fechaNacimiento),
+        `${socio.calle} ${socio.numeroCasa}`,
+        socio.localidad,
+        socio.provincia,
+        socio.telefono || '-',
+        socio.email || '-',
+        getCategoriaNombre(socio.categoriaId),
+        socio.obraSocial || '-',
+        socio.numeroAfiliado || '-',
+        formatFecha(socio.fechaAlta),
+        formatFecha(socio.fechaBaja),
+        socio.fechaBaja ? 'Inactivo' : 'Activo',
+      ]),
+      didDrawPage: (data) => {
+        if (data.pageNumber > 1) {
+          dibujarEncabezadoConLogo(doc, 'landscape');
+        }
+        const pageCount = doc.getNumberOfPages();
+        const pageSize = doc.internal.pageSize;
+        doc.setFontSize(9);
+        doc.setTextColor(150);
+        doc.text(
+          `Página ${data.pageNumber} de ${pageCount}`,
+          pageSize.width - 20,
+          pageSize.height - 10,
+          { align: 'right' },
+        );
+      },
+    });
+
+    doc.save(`Listado-Socios-${Date.now()}.pdf`);
   };
 
   const getFiltrosTexto = () => {
@@ -47,8 +129,8 @@ export const ImprimirSocios = ({ socios, categorias, filtros, onVolver }: Imprim
   return (
     <div className="imprimir-socios">
       <div className="imprimir-controls no-print">
-        <button onClick={handleImprimir} className="btn-imprimir">
-          🖨️ Imprimir
+        <button onClick={handleExportarPdf} className="btn-imprimir">
+          📄 Exportar PDF
         </button>
         <button onClick={onVolver} className="btn-volver">
           ← Volver

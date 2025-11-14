@@ -75,7 +75,7 @@ export const TablaLiquidacionesMensuales = ({
               <th>Fecha de Liquidación</th>
               <th>Socios</th>
               <th>Total Liquidado</th>
-              <th>Total Pagado</th>
+              <th>Total Cobrado</th>
               <th>Total Pendiente</th>
               <th>Acciones</th>
             </tr>

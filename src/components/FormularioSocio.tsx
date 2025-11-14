@@ -6,7 +6,7 @@ import './FormularioSocio.css';
 interface FormularioSocioProps {
   socio?: Socio;
   numeroSocioSugerido: number;
-  onSubmit: (socio: Omit<Socio, 'id'>) => void;
+  onSubmit: (socio: Omit<Socio, 'id'>) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -74,9 +74,9 @@ export const FormularioSocio = ({
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    await onSubmit(formData);
   };
 
   const formatTelefono = (value: string) => {

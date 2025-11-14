@@ -7,12 +7,35 @@ import type { Categoria } from '../types';
 import './ListaCategorias.css';
 
 export const ListaCategorias = () => {
-  const { categorias, agregarCategoria, modificarCategoria, borrarCategoria, listarCategorias } = useCategorias();
+  const {
+    agregarCategoria,
+    modificarCategoria,
+    borrarCategoria,
+    listarCategorias,
+    loading,
+    error,
+  } = useCategorias();
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [categoriaEditando, setCategoriaEditando] = useState<Categoria | undefined>(undefined);
   const [mostrarImpresion, setMostrarImpresion] = useState(false);
 
   const categoriasListadas = listarCategorias();
+
+  if (loading) {
+    return (
+      <div className="lista-categorias">
+        <p>Cargando categorías...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="lista-categorias">
+        <p className="mensaje-error">{error}</p>
+      </div>
+    );
+  }
 
   const handleAgregar = () => {
     setCategoriaEditando(undefined);
@@ -24,20 +47,32 @@ export const ListaCategorias = () => {
     setMostrarFormulario(true);
   };
 
-  const handleBorrar = (id: number) => {
+  const handleBorrar = async (id: number) => {
     if (window.confirm('¿Está seguro que desea eliminar esta categoría?')) {
-      borrarCategoria(id);
+      try {
+        await borrarCategoria(id);
+      } catch (error) {
+        const mensaje =
+          error instanceof Error ? error.message : 'No se pudo eliminar la categoría.';
+        alert(mensaje);
+      }
     }
   };
 
-  const handleSubmit = (categoriaData: Omit<Categoria, 'id'>) => {
-    if (categoriaEditando) {
-      modificarCategoria(categoriaEditando.id, categoriaData);
-    } else {
-      agregarCategoria(categoriaData);
+  const handleSubmit = async (categoriaData: Omit<Categoria, 'id'>) => {
+    try {
+      if (categoriaEditando) {
+        await modificarCategoria(categoriaEditando.id, categoriaData);
+      } else {
+        await agregarCategoria(categoriaData);
+      }
+      setMostrarFormulario(false);
+      setCategoriaEditando(undefined);
+    } catch (error) {
+      const mensaje =
+        error instanceof Error ? error.message : 'No se pudo guardar la categoría.';
+      alert(mensaje);
     }
-    setMostrarFormulario(false);
-    setCategoriaEditando(undefined);
   };
 
   const handleCancelar = () => {
@@ -74,9 +109,9 @@ export const ListaCategorias = () => {
           <button onClick={handleAgregar} className="btn-agregar">
             + Agregar Categoría
           </button>
-          <button onClick={() => setMostrarImpresion(true)} className="btn-imprimir">
-            🖨️ Imprimir
-          </button>
+              <button onClick={() => setMostrarImpresion(true)} className="btn-imprimir">
+                📄 Exportar PDF
+              </button>
         </div>
       </div>
 

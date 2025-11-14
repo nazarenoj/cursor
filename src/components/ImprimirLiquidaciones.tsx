@@ -1,4 +1,7 @@
 import { format } from 'date-fns';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { dibujarEncabezadoConLogo } from '../utils/pdfLogo';
 import type { LiquidacionCuota } from '../types';
 import './ImprimirLiquidaciones.css';
 
@@ -9,8 +12,80 @@ interface ImprimirLiquidacionesProps {
 }
 
 export const ImprimirLiquidaciones = ({ liquidaciones, mesFiltro, onVolver }: ImprimirLiquidacionesProps) => {
-  const handleImprimir = () => {
-    window.print();
+  const handleExportarPdf = () => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    const fecha = new Date().toLocaleString('es-AR');
+
+    // Encabezado con logo
+    dibujarEncabezadoConLogo(doc, 'landscape');
+
+    // Información del documento
+    doc.setTextColor(45, 55, 72);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.text(`Fecha de generación: ${fecha}`, 14, 38);
+    if (mesFiltro) {
+      doc.text(`Mes: ${getNombreMes(mesFiltro)}`, 14, 45);
+    }
+    doc.text(`Total de liquidaciones: ${liquidaciones.length}`, 14, 52);
+    doc.text(`Total liquidado: $${totalMonto.toFixed(2)}`, 14, 59);
+    doc.text(`Total cobrado: $${totalPagado.toFixed(2)}`, 14, 66);
+    doc.text(`Total pendiente: $${totalPendiente.toFixed(2)}`, 14, 73);
+
+    // Tabla
+    autoTable(doc, {
+      startY: 81,
+      headStyles: {
+        fillColor: [102, 126, 234],
+        textColor: 255,
+        fontSize: 9,
+      },
+      bodyStyles: {
+        textColor: 45,
+        fontSize: 8,
+      },
+      head: [[
+        'N° Socio',
+        'Apellido',
+        'Nombre',
+        'Categoría',
+        'Mes',
+        'Fecha Liquidación',
+        'Monto',
+        'Estado',
+        'Fecha Pago',
+        'Medio de Pago',
+      ]],
+      body: liquidaciones.map((liquidacion) => [
+        liquidacion.numeroSocio.toString(),
+        liquidacion.apellido,
+        liquidacion.nombre,
+        liquidacion.categoriaNombre,
+        getNombreMes(liquidacion.mes),
+        formatFecha(liquidacion.fechaLiquidacion),
+        `$${liquidacion.monto.toFixed(2)}`,
+        liquidacion.pagado ? 'Pagado' : 'Pendiente',
+        formatFecha(liquidacion.fechaPago),
+        liquidacion.medioPago ?? '-',
+      ]),
+      didDrawPage: (data) => {
+        if (data.pageNumber > 1) {
+          dibujarEncabezadoConLogo(doc, 'landscape');
+        }
+        const pageCount = doc.getNumberOfPages();
+        const pageSize = doc.internal.pageSize;
+        doc.setFontSize(9);
+        doc.setTextColor(150);
+        doc.text(
+          `Página ${data.pageNumber} de ${pageCount}`,
+          pageSize.width - 20,
+          pageSize.height - 10,
+          { align: 'right' },
+        );
+      },
+    });
+
+    doc.save(`Listado-Liquidaciones-${Date.now()}.pdf`);
   };
 
   const formatFecha = (fecha: string | null) => {
@@ -35,8 +110,8 @@ export const ImprimirLiquidaciones = ({ liquidaciones, mesFiltro, onVolver }: Im
   return (
     <div className="imprimir-liquidaciones">
       <div className="imprimir-controls no-print">
-        <button onClick={handleImprimir} className="btn-imprimir">
-          🖨️ Imprimir
+        <button onClick={handleExportarPdf} className="btn-imprimir">
+          📄 Exportar PDF
         </button>
         <button onClick={onVolver} className="btn-volver">
           ← Volver
@@ -59,7 +134,7 @@ export const ImprimirLiquidaciones = ({ liquidaciones, mesFiltro, onVolver }: Im
             <span className="resumen-valor">${totalMonto.toFixed(2)}</span>
           </div>
           <div className="resumen-item">
-            <span className="resumen-label">Total Pagado:</span>
+            <span className="resumen-label">Total Cobrado:</span>
             <span className="resumen-valor">${totalPagado.toFixed(2)}</span>
           </div>
           <div className="resumen-item">

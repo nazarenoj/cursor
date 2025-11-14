@@ -1,9 +1,15 @@
 import { useMemo, useState } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { Pie } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import type { ChartOptions, TooltipItem } from 'chart.js';
+import { dibujarEncabezadoConLogo } from '../utils/pdfLogo';
 import { useLiquidaciones } from '../hooks/useLiquidaciones';
 import { useCategorias } from '../hooks/useCategorias';
 import './ListadoPagos.css';
+
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 type FiltrosPagos = {
   fechaDesde: string;
@@ -14,7 +20,7 @@ type FiltrosPagos = {
   categoriaId: string;
 };
 
-type PagoFiltrado = {
+type CuotaExtendida = {
   id: number;
   numeroSocio: number;
   apellido: string;
@@ -25,6 +31,7 @@ type PagoFiltrado = {
   monto: number;
   medioPago: string | null;
   categoriaId: number;
+  pagado: boolean;
 };
 
 const formatearMes = (mesString: string) => {
@@ -46,91 +53,183 @@ export const ListadoPagos = () => {
     medioPago: '',
     categoriaId: '',
   });
+  const [mostrarGrafico, setMostrarGrafico] = useState(false);
 
-  const mapPago = (cuota: (typeof liquidacionesCuotas)[number]): PagoFiltrado => {
-    const liquidacionMensual = liquidacionesMensuales.find(
-      (lm) => lm.id === cuota.liquidacionMensualId,
-    );
-
-    return {
-      ...cuota,
-      mes: liquidacionMensual?.mes || '',
-      fechaLiquidacion: liquidacionMensual?.fechaLiquidacion || '',
-    };
-  };
-
-  const pagos = useMemo<PagoFiltrado[]>(() => {
+  const cuotas = useMemo<CuotaExtendida[]>(() => {
     return liquidacionesCuotas
-      .filter((cuota) => cuota.pagado)
-      .map(mapPago)
+      .map((cuota) => {
+        const liquidacionMensual = liquidacionesMensuales.find(
+          (lm) => lm.id === cuota.liquidacionMensualId,
+        );
+        return {
+          ...cuota,
+          mes: liquidacionMensual?.mes || '',
+          fechaLiquidacion: liquidacionMensual?.fechaLiquidacion || '',
+        };
+      })
       .sort((a, b) => (b.fechaPago || '').localeCompare(a.fechaPago || ''));
   }, [liquidacionesCuotas, liquidacionesMensuales]);
 
   const mesesDisponibles = useMemo(() => {
-    return Array.from(new Set(pagos.map((pago) => pago.mes).filter(Boolean))).sort().reverse();
-  }, [pagos]);
+    const meses = new Set<string>();
+    cuotas.forEach((cuota) => {
+      if (cuota.mes) {
+        meses.add(cuota.mes);
+      }
+    });
+    return Array.from(meses).sort().reverse();
+  }, [cuotas]);
 
   const mediosDisponibles = useMemo(() => {
-    const set = new Set<string>();
-    pagos.forEach((pago) => {
-      if (pago.medioPago) {
-        pago.medioPago.split(',').forEach((segmento) => {
+    const medios = new Set<string>();
+    cuotas.forEach((cuota) => {
+      if (cuota.medioPago) {
+        cuota.medioPago.split(',').forEach((segmento) => {
           const medio = segmento.split(':')[0]?.trim();
           if (medio) {
-            set.add(medio);
+            medios.add(medio);
           }
         });
       }
     });
-    return Array.from(set.values());
-  }, [pagos]);
+    return Array.from(medios.values());
+  }, [cuotas]);
 
-  const pagosFiltrados = useMemo(() => {
-    return pagos.filter((pago) => {
-      if (filtros.fechaDesde && pago.fechaPago && new Date(pago.fechaPago) < new Date(filtros.fechaDesde)) {
-        return false;
+  const cuotasFiltradas = useMemo(() => {
+    return cuotas.filter((cuota) => {
+      if (filtros.fechaDesde) {
+        if (!cuota.fechaPago) return false;
+        if (new Date(cuota.fechaPago) < new Date(filtros.fechaDesde)) {
+          return false;
+        }
       }
-      if (filtros.fechaHasta && pago.fechaPago && new Date(pago.fechaPago) > new Date(filtros.fechaHasta)) {
-        return false;
+      if (filtros.fechaHasta) {
+        if (!cuota.fechaPago) return false;
+        if (new Date(cuota.fechaPago) > new Date(filtros.fechaHasta)) {
+          return false;
+        }
       }
       if (filtros.socio) {
-        const texto = `${pago.numeroSocio} ${pago.apellido} ${pago.nombre}`.toLowerCase();
+        const texto = `${cuota.numeroSocio} ${cuota.apellido} ${cuota.nombre}`.toLowerCase();
         if (!texto.includes(filtros.socio.toLowerCase())) {
           return false;
         }
       }
-      if (filtros.mes && pago.mes !== filtros.mes) {
+      if (filtros.mes && cuota.mes !== filtros.mes) {
         return false;
       }
-      if (
-        filtros.medioPago &&
-        (!pago.medioPago || !pago.medioPago.toLowerCase().includes(filtros.medioPago.toLowerCase()))
-      ) {
-        return false;
+      if (filtros.medioPago) {
+        if (!cuota.pagado || !cuota.medioPago) {
+          return false;
+        }
+        if (!cuota.medioPago.toLowerCase().includes(filtros.medioPago.toLowerCase())) {
+          return false;
+        }
       }
-      if (filtros.categoriaId && `${pago.categoriaId}` !== filtros.categoriaId) {
+      if (filtros.categoriaId && `${cuota.categoriaId}` !== filtros.categoriaId) {
         return false;
       }
       return true;
     });
-  }, [pagos, filtros]);
+  }, [cuotas, filtros]);
 
-  const totalPagado = pagosFiltrados.reduce((sum, pago) => sum + pago.monto, 0);
+  const pagosFiltrados = useMemo(
+    () => cuotasFiltradas.filter((cuota) => cuota.pagado),
+    [cuotasFiltradas],
+  );
+
+  const totalLiquidado = useMemo(
+    () => cuotasFiltradas.reduce((sum, cuota) => sum + cuota.monto, 0),
+    [cuotasFiltradas],
+  );
+  const totalCobrado = useMemo(
+    () => pagosFiltrados.reduce((sum, cuota) => sum + cuota.monto, 0),
+    [pagosFiltrados],
+  );
+  const totalAdeudado = useMemo(
+    () => Math.max(totalLiquidado - totalCobrado, 0),
+    [totalLiquidado, totalCobrado],
+  );
+
+  const graficoData = useMemo(() => {
+    if (totalLiquidado <= 0) {
+      return null;
+    }
+    const porcentajePagado = totalCobrado > 0 ? (totalCobrado / totalLiquidado) * 100 : 0;
+    const porcentajeAdeudado = Math.max(100 - porcentajePagado, 0);
+    return {
+      labels: ['Pagado (%)', 'Adeudado (%)'],
+      datasets: [
+        {
+          label: 'Distribución porcentual',
+          data: [Number(porcentajePagado.toFixed(2)), Number(porcentajeAdeudado.toFixed(2))],
+          backgroundColor: ['rgba(72, 187, 120, 0.8)', 'rgba(244, 114, 182, 0.8)'],
+          borderColor: ['rgba(56, 161, 105, 1)', 'rgba(236, 72, 153, 1)'],
+          borderWidth: 1,
+        },
+      ],
+    };
+  }, [totalLiquidado, totalCobrado]);
+
+  const graficoOptions: ChartOptions<'pie'> = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          boxWidth: 16,
+        },
+      },
+      tooltip: {
+        callbacks: {
+          label: (context: TooltipItem<'pie'>) => {
+            const label = context.label || '';
+            const value = typeof context.parsed === 'number' ? context.parsed : 0;
+            const monto = label.startsWith('Pagado') ? totalCobrado : totalAdeudado;
+            return `${label}: ${value.toFixed(2)}% ($${monto.toLocaleString('es-AR', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })})`;
+          },
+        },
+      },
+    },
+  };
 
   return (
     <div className="listado-pagos">
       <div className="card">
         <div className="header">
-          <h1>Listado de Pagos Registrados</h1>
+          <h1>Listado de Cobros Registrados</h1>
           <div className="resumen">
             <span>
               Pagos filtrados: <strong>{pagosFiltrados.length}</strong>
             </span>
             <span>
+              Total liquidado:{' '}
+              <strong>
+                $
+                {totalLiquidado.toLocaleString('es-AR', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </strong>
+            </span>
+            <span>
               Total cobrado:{' '}
               <strong>
                 $
-                {totalPagado.toLocaleString('es-AR', {
+                {totalCobrado.toLocaleString('es-AR', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </strong>
+            </span>
+            <span>
+              Total adeudado:{' '}
+              <strong>
+                $
+                {totalAdeudado.toLocaleString('es-AR', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
@@ -139,9 +238,15 @@ export const ListadoPagos = () => {
           </div>
         </div>
 
+        {mostrarGrafico && graficoData && (
+          <div className="grafico-pagos">
+            <Pie data={graficoData} options={graficoOptions} />
+          </div>
+        )}
+
         <div className="filtros-pagos">
           <div className="filtro">
-            <label htmlFor="fecha-desde">Fecha pago desde</label>
+            <label htmlFor="fecha-desde">Fecha cobro desde</label>
             <input
               id="fecha-desde"
               type="date"
@@ -150,7 +255,7 @@ export const ListadoPagos = () => {
             />
           </div>
           <div className="filtro">
-            <label htmlFor="fecha-hasta">Fecha pago hasta</label>
+            <label htmlFor="fecha-hasta">Fecha cobro hasta</label>
             <input
               id="fecha-hasta"
               type="date"
@@ -232,6 +337,13 @@ export const ListadoPagos = () => {
             <button className="btn-exportar" onClick={() => exportarPagosPdf(pagosFiltrados)}>
               📄 Exportar PDF
             </button>
+            <button
+              className="btn-grafico"
+              onClick={() => setMostrarGrafico((prev) => !prev)}
+              disabled={!graficoData}
+            >
+              📊 {mostrarGrafico ? 'Ocultar gráfico' : 'Ver gráfico'}
+            </button>
           </div>
         </div>
 
@@ -251,7 +363,7 @@ export const ListadoPagos = () => {
               {pagosFiltrados.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="sin-datos">
-                    No hay pagos registrados todavía.
+                    No hay cobros registrados todavía.
                   </td>
                 </tr>
               ) : (
@@ -276,32 +388,29 @@ export const ListadoPagos = () => {
   );
 };
 
-const exportarPagosPdf = (pagos: PagoFiltrado[]) => {
+const exportarPagosPdf = (pagos: CuotaExtendida[]) => {
   if (pagos.length === 0) {
-    alert('No hay pagos para exportar.');
+    alert('No hay cobros para exportar.');
     return;
   }
 
   const doc = new jsPDF({ orientation: 'landscape' });
   const fecha = new Date().toLocaleString('es-AR');
 
-  doc.setFillColor(102, 126, 234);
-  doc.rect(0, 0, 297, 25, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.text('Club Social y Deportivo - Listado de Pagos', 148.5, 16, { align: 'center' });
+  // Encabezado con logo
+  dibujarEncabezadoConLogo(doc, 'landscape');
 
+  // Información del documento
   doc.setTextColor(45, 55, 72);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
-  doc.text(`Fecha de generación: ${fecha}`, 14, 33);
-  doc.text(`Pagos incluidos: ${pagos.length}`, 14, 41);
+  doc.text(`Fecha de generación: ${fecha}`, 14, 38);
+  doc.text(`Cobros incluidos: ${pagos.length}`, 14, 45);
   const total = pagos.reduce((sum, pago) => sum + pago.monto, 0);
-  doc.text(`Total cobrado: $${total.toFixed(2)}`, 14, 49);
+  doc.text(`Total cobrado: $${total.toFixed(2)}`, 14, 52);
 
   autoTable(doc, {
-    startY: 58,
+    startY: 60,
     headStyles: {
       fillColor: [102, 126, 234],
       textColor: 255,
@@ -330,7 +439,10 @@ const exportarPagosPdf = (pagos: PagoFiltrado[]) => {
       pago.fechaLiquidacion || '-',
     ]),
     didDrawPage: (data) => {
-      const pageCount = doc.internal.getNumberOfPages();
+      if (data.pageNumber > 1) {
+        dibujarEncabezadoConLogo(doc, 'landscape');
+      }
+      const pageCount = doc.getNumberOfPages();
       const pageSize = doc.internal.pageSize;
       doc.setFontSize(9);
       doc.setTextColor(150);
@@ -343,7 +455,7 @@ const exportarPagosPdf = (pagos: PagoFiltrado[]) => {
     },
   });
 
-  doc.save(`Listado-Pagos-${Date.now()}.pdf`);
+  doc.save(`Listado-Cobros-${Date.now()}.pdf`);
 };
 
 

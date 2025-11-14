@@ -14,6 +14,40 @@
   gap: 1.5rem;
 }
 
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header h1 {
+  margin: 0;
+  color: #2d3748;
+}
+
+.resumen {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  color: #4a5568;
+}
+
+.resumen strong {
+  color: #1a202c;
+}
+
+.grafico-pagos {
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.08));
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .filtros-pagos {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -42,6 +76,12 @@
   color: #2d3748;
 }
 
+.acciones-filtros {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .btn-limpiar {
   padding: 0.65rem 1rem;
   border: none;
@@ -58,28 +98,44 @@
   transform: translateY(-1px);
 }
 
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
+.btn-exportar {
+  padding: 0.65rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.header h1 {
-  margin: 0;
-  color: #2d3748;
+.btn-exportar:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.25);
 }
 
-.resumen {
-  display: flex;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-  color: #4a5568;
+.btn-grafico {
+  padding: 0.65rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.resumen strong {
-  color: #1a202c;
+.btn-grafico:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(56, 161, 105, 0.25);
+}
+
+.btn-grafico:disabled {
+  background: #c6f6d5;
+  color: #2f855a;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .tabla-wrapper {
@@ -130,6 +186,10 @@
 
   .filtros-pagos {
     grid-template-columns: 1fr;
+  }
+
+  .acciones-filtros {
+    justify-content: flex-start;
   }
 
   .tabla-pagos {

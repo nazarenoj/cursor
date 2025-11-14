@@ -43,28 +43,70 @@ La aplicación permite gestionar los siguientes datos de cada socio:
 
 ## 📋 Prerrequisitos
 
-- [Node.js](https://nodejs.org/) (versión 18 o superior)
-- npm o yarn
+- [Node.js](https://nodejs.org/) (versión 18 o superior) con npm
+- Servidor [MySQL](https://www.mysql.com/) accesible (se probó con MySQL 8)
+- Permisos para crear bases de datos y tablas con el usuario configurado (`root` por defecto)
 
 ## 🔧 Instalación
 
-1. **Instala las dependencias:**
+1. **Instalar dependencias del frontend:**
    ```bash
    npm install
    ```
 
-2. **Inicia el servidor de desarrollo:**
+2. **Instalar dependencias del backend:**
+   ```bash
+   cd server
+   npm install
+   cd ..
+   ```
+
+3. **Configurar variables de entorno del backend:**
+   ```bash
+   copy server\env.sample server\.env   # Windows
+   # o
+   cp server/env.sample server/.env     # macOS / Linux
+   ```
+   Ajustá los valores si tu servidor MySQL usa credenciales distintas. Por defecto queda:
+   ```
+   DB_USER=root
+   DB_PASSWORD=GL2025
+   DB_NAME=club_social
+   ```
+
+4. **Crear la base de datos (si todavía no existe):**
+   ```sql
+   CREATE DATABASE IF NOT EXISTS club_social
+     CHARACTER SET utf8mb4
+     COLLATE utf8mb4_spanish_ci;
+   ```
+
+5. **Levantar el backend (Express + MySQL):**
+   ```bash
+   npm run server
+   ```
+   El API se expone en `http://localhost:4000/api`.
+
+6. **En otra terminal, iniciar el frontend:**
    ```bash
    npm run dev
    ```
 
-3. **Abre tu navegador:**
-   La aplicación estará disponible en `http://localhost:5173`
+7. **Abrir el navegador:**
+   La aplicación estará disponible en `http://localhost:5173`. Asegurate de mantener el backend en ejecución para que la app pueda leer y guardar datos.
 
 ## 📁 Estructura del Proyecto
 
 ```
 .
+├── server/
+│   ├── package.json
+│   ├── env.sample
+│   └── src/
+│       ├── index.js              # Punto de entrada del servidor Express
+│       ├── db.js                 # Configuración de MySQL y migraciones
+│       ├── routes/               # Rutas de la API (socios, categorías, liquidaciones)
+│       └── utils/                # Utilidades comunes
 ├── src/
 │   ├── components/          # Componentes React
 │   │   ├── FormularioSocio.tsx
@@ -84,7 +126,7 @@ La aplicación permite gestionar los siguientes datos de cada socio:
 │   │   ├── useSocios.ts
 │   │   └── useCategorias.ts
 │   ├── services/           # Servicios
-│   │   └── storage.ts
+│   │   └── api.ts          # Cliente HTTP hacia el backend Express
 │   ├── types/              # Tipos TypeScript
 │   │   └── index.ts
 │   ├── App.tsx             # Componente principal
@@ -98,19 +140,28 @@ La aplicación permite gestionar los siguientes datos de cada socio:
 
 ## 🛠️ Scripts Disponibles
 
-- `npm run dev` - Inicia el servidor de desarrollo
+- `npm run dev` - Inicia el frontend (Vite)
+- `npm run server` - Inicia el backend Express (usa nodemon para recarga en caliente)
 - `npm run build` - Construye la aplicación para producción
 - `npm run preview` - Previsualiza la versión de producción
 - `npm run lint` - Ejecuta el linter para verificar el código
 
 ## 💾 Almacenamiento de Datos
 
-Por defecto, la aplicación utiliza **localStorage** del navegador para almacenar los datos. Esto significa que:
-- Los datos se guardan localmente en tu navegador
-- Los datos persisten entre sesiones
-- Cada navegador tiene su propia base de datos
+La aplicación ahora persiste toda la información en **MySQL** a través de la API Express. Esto permite:
 
-**Nota:** Para producción, se recomienda reemplazar el servicio de almacenamiento por llamadas a una API backend.
+- Compartir datos entre todas las PCs conectadas al servidor
+- Mantener integridad mediante claves foráneas y validaciones
+- Registrar liquidaciones mensuales y cuotas con su estado de pago
+
+Tablas creadas automáticamente al iniciar el backend:
+
+- `categorias`
+- `socios`
+- `liquidaciones_mensuales`
+- `liquidaciones_cuotas`
+
+> Si necesitás cambiar las credenciales o el nombre de la base, editá `server/.env` antes de iniciar el servidor.
 
 ## 📖 Uso de la Aplicación
 
@@ -155,12 +206,13 @@ Por defecto, la aplicación utiliza **localStorage** del navegador para almacena
 
 ## 🎨 Características Técnicas
 
-- **React 18** - Biblioteca de JavaScript para construir interfaces
-- **TypeScript** - Tipado estático para mayor seguridad
-- **Vite** - Herramienta de construcción rápida
-- **React Router** - Navegación entre páginas
-- **date-fns** - Manejo de fechas
-- **localStorage** - Almacenamiento local de datos
+- **React 18 + TypeScript** para el frontend
+- **Vite** como bundler y servidor de desarrollo
+- **React Router 6** para enrutamiento
+- **date-fns**, **jspdf**, **chart.js** y **react-chartjs-2** para utilitarios y reportes
+- **Node.js + Express 5** como API REST
+- **mysql2** y **MySQL 8** como motor de base de datos
+- **nodemon** para recarga automática del servidor durante el desarrollo
 
 ## 🔄 Regla General de CRUD
 
@@ -195,3 +247,4 @@ Todas las tablas del sistema implementan las siguientes funciones:
 ---
 
 **Desarrollado con ❤️ para la gestión eficiente de clubes sociales y deportivos**
+

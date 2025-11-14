@@ -4,7 +4,7 @@ import './FormularioCategoria.css';
 
 interface FormularioCategoriaProps {
   categoria?: Categoria;
-  onSubmit: (categoria: Omit<Categoria, 'id'>) => void;
+  onSubmit: (categoria: Omit<Categoria, 'id'>) => void | Promise<void>;
   onCancel: () => void;
 }
 
@@ -12,11 +12,11 @@ export const FormularioCategoria = ({ categoria, onSubmit, onCancel }: Formulari
   const [nombre, setNombre] = useState(categoria?.nombre || '');
   const [costoCuota, setCostoCuota] = useState(categoria?.costoCuota?.toString() || '0');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ 
+    await onSubmit({
       nombre,
-      costoCuota: parseFloat(costoCuota) || 0
+      costoCuota: parseFloat(costoCuota) || 0,
     });
   };
 

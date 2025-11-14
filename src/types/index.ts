@@ -66,4 +66,25 @@ export interface LiquidacionCuota {
   medioPago: string | null;
 }
 
+export interface Usuario {
+  id: number;
+  usuario: string;
+  activo: boolean;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: {
+    id: number;
+    usuario: string;
+  };
+}
+
+export interface Permiso {
+  id: number;
+  codigo: string;
+  nombre: string;
+  descripcion: string | null;
+}
+
 

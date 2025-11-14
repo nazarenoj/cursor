@@ -1,10 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { Pie } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import type { ChartOptions, TooltipItem } from 'chart.js';
 import { useLiquidaciones } from '../hooks/useLiquidaciones';
 import { FormularioLiquidacion } from './FormularioLiquidacion';
 import { TablaLiquidaciones } from './TablaLiquidaciones';
 import { TablaLiquidacionesMensuales } from './TablaLiquidacionesMensuales';
 import { ImprimirLiquidaciones } from './ImprimirLiquidaciones';
 import './ListaLiquidaciones.css';
+
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 export const ListaLiquidaciones = () => {
   const { 
@@ -16,7 +21,9 @@ export const ListaLiquidaciones = () => {
     borrarLiquidacionCuota,
     borrarLiquidacionMensual,
     listarLiquidaciones,
-    getLiquidacionMensualPorMes
+    getLiquidacionMensualPorMes,
+    loading: loadingLiquidaciones,
+    error: errorLiquidaciones,
   } = useLiquidaciones();
   
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
@@ -24,6 +31,67 @@ export const ListaLiquidaciones = () => {
   const [mesImpresion, setMesImpresion] = useState<string | null>(null);
   const [mostrarImpresion, setMostrarImpresion] = useState(false);
   const [error, setError] = useState<string>('');
+  const [mostrarGrafico, setMostrarGrafico] = useState(false);
+  const [filtroDesde, setFiltroDesde] = useState('');
+  const [filtroHasta, setFiltroHasta] = useState('');
+
+  const totalLiquidado = useMemo(
+    () => liquidacionesCuotas.reduce((sum, cuota) => sum + cuota.monto, 0),
+    [liquidacionesCuotas],
+  );
+  const totalCobrado = useMemo(
+    () => liquidacionesCuotas.filter((cuota) => cuota.pagado).reduce((sum, cuota) => sum + cuota.monto, 0),
+    [liquidacionesCuotas],
+  );
+  const totalAdeudado = useMemo(
+    () => Math.max(totalLiquidado - totalCobrado, 0),
+    [totalLiquidado, totalCobrado],
+  );
+
+  const graficoData = useMemo(() => {
+    if (totalLiquidado <= 0) {
+      return null;
+    }
+    const porcentajePagado = totalCobrado > 0 ? (totalCobrado / totalLiquidado) * 100 : 0;
+    const porcentajeAdeudado = Math.max(100 - porcentajePagado, 0);
+    return {
+      labels: ['Pagado (%)', 'Adeudado (%)'],
+      datasets: [
+        {
+          label: 'Distribución porcentual',
+          data: [Number(porcentajePagado.toFixed(2)), Number(porcentajeAdeudado.toFixed(2))],
+          backgroundColor: ['rgba(72, 187, 120, 0.8)', 'rgba(244, 114, 182, 0.8)'],
+          borderColor: ['rgba(56, 161, 105, 1)', 'rgba(236, 72, 153, 1)'],
+          borderWidth: 1,
+        },
+      ],
+    };
+  }, [totalLiquidado, totalCobrado]);
+
+  const graficoOptions: ChartOptions<'pie'> = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          boxWidth: 16,
+        },
+      },
+      tooltip: {
+        callbacks: {
+          label: (context: TooltipItem<'pie'>) => {
+            const label = context.label || '';
+            const value = typeof context.parsed === 'number' ? context.parsed : 0;
+            const monto = label.startsWith('Pagado') ? totalCobrado : totalAdeudado;
+            return `${label}: ${value.toFixed(2)}% ($${monto.toLocaleString('es-AR', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })})`;
+          },
+        },
+      },
+    },
+  };
 
   // Función helper para obtener el mes de una cuota
   const getMesDeCuota = (cuota: typeof liquidacionesCuotas[0]): string => {
@@ -35,6 +103,18 @@ export const ListaLiquidaciones = () => {
   const getFechaLiquidacionDeCuota = (cuota: typeof liquidacionesCuotas[0]): string => {
     const liquidacionMensual = liquidacionesMensuales.find(lm => lm.id === cuota.liquidacionMensualId);
     return liquidacionMensual?.fechaLiquidacion || '';
+  };
+
+  const ordenarPorMes = (
+    a: { mes: string; fechaLiquidacion: string },
+    b: { mes: string; fechaLiquidacion: string },
+  ) => {
+    if (b.mes !== a.mes) {
+      return b.mes.localeCompare(a.mes);
+    }
+    const fechaA = a.fechaLiquidacion || '';
+    const fechaB = b.fechaLiquidacion || '';
+    return fechaB.localeCompare(fechaA);
   };
 
 const getNombreMes = (mesString: string) => {
@@ -51,23 +131,36 @@ const getNombreMes = (mesString: string) => {
     fechaLiquidacion: getFechaLiquidacionDeCuota(cuota),
   }));
 
-  const ordenarPorMes = (a: { mes: string; fechaLiquidacion: string }, b: { mes: string; fechaLiquidacion: string }) => {
-    // Ordenar por mes descendente (más reciente primero)
-    if (b.mes !== a.mes) {
-      return b.mes.localeCompare(a.mes);
-    }
-    // Si es el mismo mes, ordenar por fecha de liquidación
-    return b.fechaLiquidacion.localeCompare(a.fechaLiquidacion);
-  };
+  const liquidacionesFiltradas = useMemo(() => {
+    return todasLiquidaciones.filter((cuota) => {
+      if (filtroDesde) {
+        const fechaLiquidacion = cuota.fechaLiquidacion || '';
+        const fechaComparar = fechaLiquidacion ? new Date(fechaLiquidacion) : null;
+        if (!fechaComparar || fechaComparar < new Date(filtroDesde)) {
+          return false;
+        }
+      }
+      if (filtroHasta) {
+        const fechaLiquidacion = cuota.fechaLiquidacion || '';
+        const fechaComparar = fechaLiquidacion ? new Date(fechaLiquidacion) : null;
+        if (!fechaComparar || fechaComparar > new Date(filtroHasta)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [todasLiquidaciones, filtroDesde, filtroHasta]);
 
-  const cuotasOrdenadas = [...todasLiquidaciones].sort(ordenarPorMes);
+  const cuotasOrdenadas = useMemo(() => {
+    return [...liquidacionesFiltradas].sort(ordenarPorMes);
+  }, [liquidacionesFiltradas]);
 
   const obtenerCuotasPorMes = (mes: string) => cuotasOrdenadas.filter(l => l.mes === mes);
 
-  const handleGenerar = (mes: string) => {
+  const handleGenerar = async (mes: string) => {
     try {
       setError('');
-      generarLiquidacionMensual(mes);
+      await generarLiquidacionMensual(mes);
       setMostrarFormulario(false);
       alert(`Liquidación generada exitosamente para el mes ${mes}`);
     } catch (err) {
@@ -77,22 +170,33 @@ const getNombreMes = (mesString: string) => {
     }
   };
 
-  const handleMarcarPagado = (id: number) => {
+  const handleMarcarPagado = async (id: number) => {
     if (window.confirm('¿Marcar esta liquidación como pagada?')) {
-      marcarComoPagado(id);
+      try {
+        await marcarComoPagado(id);
+      } catch (error) {
+        const mensaje = error instanceof Error ? error.message : 'No se pudo marcar como pagada.';
+        alert(mensaje);
+      }
     }
   };
 
-  const handleMarcarNoPagado = (id: number) => {
+  const handleMarcarNoPagado = async (id: number) => {
     if (window.confirm('¿Marcar esta liquidación como no pagada?')) {
-      marcarComoNoPagado(id);
+      try {
+        await marcarComoNoPagado(id);
+      } catch (error) {
+        const mensaje =
+          error instanceof Error ? error.message : 'No se pudo marcar como pendiente.';
+        alert(mensaje);
+      }
     }
   };
 
-  const handleBorrar = (id: number) => {
+  const handleBorrar = async (id: number) => {
     if (window.confirm('¿Está seguro que desea eliminar esta liquidación individual?')) {
       try {
-        borrarLiquidacionCuota(id);
+        await borrarLiquidacionCuota(id);
       } catch (err) {
         const mensaje = err instanceof Error ? err.message : 'Error al borrar la liquidación';
         alert(mensaje);
@@ -100,13 +204,13 @@ const getNombreMes = (mesString: string) => {
     }
   };
 
-  const handleBorrarLiquidacionMensual = (mes: string) => {
+  const handleBorrarLiquidacionMensual = async (mes: string) => {
     const liquidacionMensual = getLiquidacionMensualPorMes(mes);
     if (!liquidacionMensual) return;
 
     if (window.confirm(`¿Está seguro que desea eliminar toda la liquidación del mes ${mes}? Esto eliminará todas las cuotas relacionadas.`)) {
       try {
-        borrarLiquidacionMensual(liquidacionMensual.id);
+        await borrarLiquidacionMensual(liquidacionMensual.id);
         if (mesDetalle === mes) {
           setMesDetalle(null);
         }
@@ -138,6 +242,22 @@ const getNombreMes = (mesString: string) => {
     setMesImpresion(mes || null);
     setMostrarImpresion(true);
   };
+
+  if (loadingLiquidaciones) {
+    return (
+      <div className="lista-liquidaciones">
+        <p>Cargando liquidaciones...</p>
+      </div>
+    );
+  }
+
+  if (errorLiquidaciones && liquidacionesMensuales.length === 0) {
+    return (
+      <div className="lista-liquidaciones">
+        <p className="mensaje-error">{errorLiquidaciones}</p>
+      </div>
+    );
+  }
 
   if (mostrarImpresion) {
     const liquidacionesParaImpresion = mesImpresion
@@ -187,9 +307,9 @@ const getNombreMes = (mesString: string) => {
             <button onClick={handleCerrarDetalle} className="btn-volver">
               ← Volver al listado
             </button>
-            <button onClick={() => handleImprimirMes(mesDetalle)} className="btn-imprimir">
-              🖨️ Imprimir Mes
-            </button>
+                <button onClick={() => handleImprimirMes(mesDetalle)} className="btn-imprimir">
+                  📄 Exportar PDF
+                </button>
             <button
               onClick={() => handleBorrarLiquidacionMensual(mesDetalle)}
               className="btn-borrar-mes"
@@ -215,20 +335,73 @@ const getNombreMes = (mesString: string) => {
       <div className="lista-header">
         <h1>Gestión de Liquidaciones Mensuales</h1>
         <div className="lista-actions">
+          <div className="filtros-fecha">
+            <div className="filtro">
+              <label htmlFor="liquidaciones-desde">Fecha desde</label>
+              <input
+                id="liquidaciones-desde"
+                type="date"
+                value={filtroDesde}
+                onChange={(e) => setFiltroDesde(e.target.value)}
+              />
+            </div>
+            <div className="filtro">
+              <label htmlFor="liquidaciones-hasta">Fecha hasta</label>
+              <input
+                id="liquidaciones-hasta"
+                type="date"
+                value={filtroHasta}
+                onChange={(e) => setFiltroHasta(e.target.value)}
+              />
+            </div>
+          </div>
           <button onClick={() => setMostrarFormulario(true)} className="btn-agregar">
             + Generar Liquidación
           </button>
-          {cuotasOrdenadas.length > 0 && (
-            <button onClick={() => handleImprimirMes()} className="btn-imprimir">
-              🖨️ Imprimir Todas
-            </button>
-          )}
+              {cuotasOrdenadas.length > 0 && (
+                <button onClick={() => handleImprimirMes()} className="btn-imprimir">
+                  📄 Exportar PDF
+                </button>
+              )}
+          <button
+            className="btn-grafico"
+            onClick={() => setMostrarGrafico((prev) => !prev)}
+            disabled={!graficoData}
+          >
+            📊 {mostrarGrafico ? 'Ocultar gráfico' : 'Ver gráfico'}
+          </button>
         </div>
       </div>
 
+      {mostrarGrafico && graficoData && (
+        <div className="grafico-liquidaciones">
+          <Pie data={graficoData} options={graficoOptions} />
+          <div className="resumen-grafico">
+            <div>
+              <span>Total liquidado:</span> ${totalLiquidado.toLocaleString('es-AR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </div>
+            <div>
+              <span>Total cobrado:</span> ${totalCobrado.toLocaleString('es-AR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </div>
+            <div>
+              <span>Total adeudado:</span> ${totalAdeudado.toLocaleString('es-AR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       <TablaLiquidacionesMensuales
         liquidacionesMensuales={liquidacionesMensuales}
-        liquidacionesCuotas={liquidacionesCuotas}
+        liquidacionesCuotas={cuotasOrdenadas}
         onVerDetalle={handleVerDetalle}
         onImprimir={handleImprimirMes}
         onBorrar={handleBorrarLiquidacionMensual}

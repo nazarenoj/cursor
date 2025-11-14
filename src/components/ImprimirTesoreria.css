@@ -1,0 +1,411 @@
+.imprimir-tesoreria {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.imprimir-controls {
+  margin-bottom: 2rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.btn-imprimir,
+.btn-volver {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-imprimir {
+  background-color: #667eea;
+  color: white;
+}
+
+.btn-imprimir:hover {
+  background-color: #5568d3;
+}
+
+.btn-volver {
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+.btn-volver:hover {
+  background-color: #e0e0e0;
+}
+
+.imprimir-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.imprimir-header {
+  margin-bottom: 2rem;
+  text-align: center;
+  border-bottom: 3px solid #667eea;
+  padding-bottom: 1.5rem;
+}
+
+.imprimir-header h1 {
+  color: #2d3748;
+  font-size: 2.5rem;
+  margin: 0.5rem 0;
+  font-weight: 700;
+}
+
+.imprimir-header h2 {
+  color: #667eea;
+  font-size: 1.5rem;
+  margin: 0.5rem 0;
+  font-weight: 600;
+}
+
+.fecha-impresion,
+.filtros-aplicados {
+  margin: 0.75rem 0;
+  color: #666;
+  font-size: 1rem;
+}
+
+.filtros-aplicados {
+  font-weight: 500;
+  color: #4a5568;
+}
+
+.resumen-impresion {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+  border-radius: 12px;
+  border: 2px solid #e2e8f0;
+}
+
+.resumen-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.resumen-total {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  grid-column: 1 / -1;
+}
+
+.resumen-total .resumen-label,
+.resumen-total .resumen-valor {
+  color: white;
+}
+
+.resumen-label {
+  font-size: 0.95rem;
+  color: #666;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.resumen-valor {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.resumen-total .resumen-valor {
+  font-size: 2.5rem;
+}
+
+.medio-section-impresion {
+  margin-bottom: 3rem;
+  page-break-inside: avoid;
+}
+
+.medio-header-impresion {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e2e8f0;
+  page-break-after: avoid;
+}
+
+.medio-header-impresion h3 {
+  margin: 0;
+  color: #2d3748;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.medio-cantidad-impresion {
+  color: #718096;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.tabla-imprimir {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin-top: 1rem;
+}
+
+.tabla-imprimir thead {
+  background-color: #667eea;
+  color: white;
+}
+
+.tabla-imprimir th {
+  padding: 1rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  border: 1px solid #ddd;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+.tabla-imprimir td {
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  color: #2d3748;
+}
+
+.tabla-imprimir tbody tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+
+.tabla-imprimir tbody tr:hover {
+  background-color: #f3f4f6;
+}
+
+.tabla-imprimir .monto {
+  font-weight: 600;
+  color: #48bb78;
+  text-align: right;
+}
+
+.sin-datos-impresion {
+  text-align: center;
+  padding: 3rem;
+  color: #718096;
+  font-size: 1.2rem;
+  font-style: italic;
+}
+
+/* Estilos para impresión */
+@media print {
+  @page {
+    margin: 1.5cm;
+    size: A4;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  /* Ocultar navbar y layout */
+  .navbar,
+  .layout > nav,
+  .layout {
+    display: none !important;
+  }
+
+  /* Mostrar solo el contenido de impresión */
+  .main-content {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .imprimir-tesoreria {
+    padding: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    display: block !important;
+    background: white !important;
+    position: relative !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .imprimir-content {
+    box-shadow: none !important;
+    padding: 0 !important;
+    display: block !important;
+    background: white !important;
+    border-radius: 0 !important;
+  }
+
+  .imprimir-header {
+    page-break-after: avoid;
+    margin-bottom: 1.5rem;
+    display: block !important;
+    background: white !important;
+    border-bottom: 2px solid #000 !important;
+    padding-bottom: 1rem !important;
+  }
+
+  .imprimir-header h1 {
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .imprimir-header h2 {
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .fecha-impresion,
+  .filtros-aplicados {
+    color: #000 !important;
+  }
+
+  .resumen-impresion {
+    page-break-after: avoid;
+    margin-bottom: 1.5rem;
+    display: grid !important;
+    background: white !important;
+    border: 1px solid #000 !important;
+    border-radius: 0 !important;
+    padding: 1rem !important;
+  }
+
+  .resumen-item {
+    background: white !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  .resumen-total {
+    background: white !important;
+    border: 2px solid #000 !important;
+  }
+
+  .resumen-label,
+  .resumen-valor {
+    color: #000 !important;
+  }
+
+  .resumen-total .resumen-label,
+  .resumen-total .resumen-valor {
+    color: #000 !important;
+  }
+
+  .medio-section-impresion {
+    page-break-inside: avoid;
+    margin-bottom: 2rem;
+    display: block !important;
+    background: white !important;
+  }
+
+  .medio-header-impresion {
+    page-break-after: avoid;
+    display: flex !important;
+    border-bottom: 1px solid #000 !important;
+    padding-bottom: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+
+  .medio-header-impresion h3 {
+    color: #000 !important;
+  }
+
+  .medio-cantidad-impresion {
+    color: #000 !important;
+  }
+
+  .tabla-imprimir {
+    display: table !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    background: white !important;
+  }
+
+  .tabla-imprimir thead {
+    display: table-header-group !important;
+    background: white !important;
+    border: 1px solid #000 !important;
+  }
+
+  .tabla-imprimir thead th {
+    background: white !important;
+    color: #000 !important;
+    border: 1px solid #000 !important;
+    font-weight: bold !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .tabla-imprimir tbody {
+    display: table-row-group !important;
+    background: white !important;
+  }
+
+  .tabla-imprimir tr {
+    display: table-row !important;
+    background: white !important;
+  }
+
+  .tabla-imprimir tbody tr:nth-child(even) {
+    background: white !important;
+  }
+
+  .tabla-imprimir td {
+    display: table-cell !important;
+    color: #000 !important;
+    border: 1px solid #ccc !important;
+    background: white !important;
+    padding: 0.5rem !important;
+  }
+
+  .tabla-imprimir th {
+    display: table-cell !important;
+    color: #000 !important;
+    border: 1px solid #000 !important;
+    background: white !important;
+    padding: 0.5rem !important;
+  }
+
+  .tabla-imprimir .monto {
+    color: #000 !important;
+    font-weight: bold !important;
+  }
+
+  .tabla-imprimir tbody tr {
+    page-break-inside: avoid;
+  }
+
+  .tabla-imprimir tbody tr:last-child {
+    page-break-after: auto;
+  }
+
+  .sin-datos-impresion {
+    color: #000 !important;
+  }
+}
+

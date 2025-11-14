@@ -22,6 +22,34 @@
 .lista-actions {
   display: flex;
   gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.filtros-fecha {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.filtro {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.filtro label {
+  font-size: 0.85rem;
+  color: #4a5568;
+  font-weight: 600;
+}
+
+.filtro input[type='date'] {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #cbd5f5;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #2d3748;
 }
 
 .btn-agregar,
@@ -51,6 +79,31 @@
 
 .btn-imprimir:hover {
   background-color: #38a169;
+}
+
+.btn-grafico {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+}
+
+.btn-grafico:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(72, 187, 120, 0.25);
+}
+
+.btn-grafico:disabled {
+  background: #c6f6d5;
+  color: #2f855a;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .btn-volver {
@@ -123,6 +176,36 @@
   font-size: 0.9rem;
 }
 
+.grafico-liquidaciones {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  margin-bottom: 2rem;
+  display: grid;
+  gap: 1.5rem;
+}
+
+.grafico-liquidaciones canvas {
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.resumen-grafico {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+  color: #2d3748;
+  font-weight: 600;
+}
+
+.resumen-grafico span {
+  color: #718096;
+  font-weight: 500;
+  margin-right: 0.35rem;
+}
+
 .error-message {
   background-color: #fed7d7;
   color: #742a2a;
@@ -153,6 +236,19 @@
   }
 
   .select-filtro {
+    width: 100%;
+  }
+
+  .lista-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filtros-fecha {
+    width: 100%;
+  }
+
+  .filtros-fecha .filtro {
     width: 100%;
   }
 }
