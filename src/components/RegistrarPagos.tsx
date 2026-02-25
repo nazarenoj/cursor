@@ -1,44 +1,59 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
+import { useClubConfig } from '../contexts/ClubConfigContext';
 import { useLiquidaciones } from '../hooks/useLiquidaciones';
 import { useCategorias } from '../hooks/useCategorias';
-import type { MedioPago, Socio } from '../types';
+import { dibujarEncabezadoConLogo } from '../utils/pdfLogo';
+import { apiService } from '../services/api';
+import type { MedioPagoDB, Socio } from '../types';
 import './RegistrarPagos.css';
-
-const MEDIOS_PAGO: MedioPago[] = [
-  'Efectivo',
-  'Débito automático',
-  'Mercado Pago',
-  'Transferencia bancaria',
-  'Cheque',
-  'Tarjeta de crédito',
-];
 
 interface RegistrarPagosProps {
   socio?: Socio;
 }
 
 type MedioSeleccion = {
-  medio: MedioPago;
+  medio: string; // Nombre del medio de pago
   monto: number;
   editado: boolean;
 };
 
 export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
   const navigate = useNavigate();
+  const { nombreClub } = useClubConfig();
   const {
     liquidacionesCuotas,
     liquidacionesMensuales,
     marcarCuotasComoPagadas,
   } = useLiquidaciones();
   const { categorias } = useCategorias();
-  const [mediosSeleccionados, setMediosSeleccionados] = useState<MedioSeleccion[]>([
-    { medio: 'Efectivo', monto: 0, editado: false },
-  ]);
+  const [mediosPago, setMediosPago] = useState<MedioPagoDB[]>([]);
+  const [mediosSeleccionados, setMediosSeleccionados] = useState<MedioSeleccion[]>([]);
   const [cuotasSeleccionadas, setCuotasSeleccionadas] = useState<Set<number>>(new Set());
   const [alerta, setAlerta] = useState<{ tipo: 'info' | 'error'; texto: string } | null>(null);
   const [ultimoRecibo, setUltimoRecibo] = useState<{ url: string; nombre: string } | null>(null);
+
+  useEffect(() => {
+    loadMediosPago();
+  }, []);
+
+  const loadMediosPago = async () => {
+    try {
+      const data = await apiService.getMediosPago();
+      const activos = data.filter((m) => m.activo);
+      setMediosPago(activos);
+      // Si hay medios activos, seleccionar el primero por defecto
+      if (activos.length > 0) {
+        setMediosSeleccionados([{ medio: activos[0].nombre, monto: 0, editado: false }]);
+      }
+    } catch (err) {
+      console.error('Error al cargar medios de pago:', err);
+      // Fallback a medios por defecto si falla la carga
+      setMediosPago([]);
+      setMediosSeleccionados([{ medio: 'Efectivo', monto: 0, editado: false }]);
+    }
+  };
 
   const cuotasPendientes = useMemo(() => {
     return liquidacionesCuotas
@@ -70,10 +85,12 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
     return Number((totalSeleccionado - sumaMediosSeleccionados).toFixed(2));
   }, [totalSeleccionado, sumaMediosSeleccionados]);
 
-  const ajustarDistribucion = (items: MedioSeleccion[], total: number): MedioSeleccion[] => {
+  const ajustarDistribucion = (items: MedioSeleccion[], total: number, mediosDisponibles: MedioPagoDB[]): MedioSeleccion[] => {
     const lista: MedioSeleccion[] =
-      items.length === 0
-        ? [{ medio: 'Efectivo' as MedioPago, monto: 0, editado: false }]
+      items.length === 0 && mediosDisponibles.length > 0
+        ? [{ medio: mediosDisponibles[0].nombre, monto: 0, editado: false }]
+        : items.length === 0
+        ? [{ medio: 'Efectivo', monto: 0, editado: false }]
         : items.map((item) => ({
             ...item,
             monto: Number.isFinite(item.monto) ? Number(item.monto) : 0,
@@ -117,7 +134,7 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
 
   useEffect(() => {
     setMediosSeleccionados((prev) => {
-      const ajustado = ajustarDistribucion(prev, totalSeleccionado);
+      const ajustado = ajustarDistribucion(prev, totalSeleccionado, mediosPago);
       const igual =
         ajustado.length === prev.length &&
         ajustado.every(
@@ -128,7 +145,7 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
         );
       return igual ? prev : ajustado;
     });
-  }, [totalSeleccionado]);
+  }, [totalSeleccionado, mediosPago]);
 
   const categoriaSocio = useMemo(() => {
     if (!socio) return null;
@@ -158,7 +175,7 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
     setCuotasSeleccionadas(new Set());
   };
 
-  const toggleMedioPago = (medio: MedioPago) => {
+  const toggleMedioPago = (medio: string) => {
     setAlerta(null);
     setMediosSeleccionados((prev) => {
       let updated: MedioSeleccion[];
@@ -168,20 +185,21 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
         updated = [...prev, { medio, monto: 0, editado: false }];
       }
       if (updated.length === 0) {
-        updated = [{ medio: 'Efectivo', monto: 0, editado: false }];
+        const defaultMedio = mediosPago.length > 0 ? mediosPago[0].nombre : 'Efectivo';
+        updated = [{ medio: defaultMedio, monto: 0, editado: false }];
       }
-      return ajustarDistribucion(updated, totalSeleccionado);
+      return ajustarDistribucion(updated, totalSeleccionado, mediosPago);
     });
   };
 
-  const actualizarMontoMedio = (medio: MedioPago, monto: number) => {
+  const actualizarMontoMedio = (medio: string, monto: number) => {
     setAlerta(null);
     setMediosSeleccionados((prev) => {
       const valor = Number.isFinite(monto) ? Math.max(monto, 0) : 0;
       const actualizados = prev.map((item) =>
         item.medio === medio ? { ...item, monto: valor, editado: true } : item,
       );
-      return ajustarDistribucion(actualizados, totalSeleccionado);
+      return ajustarDistribucion(actualizados, totalSeleccionado, mediosPago);
     });
   };
 
@@ -191,6 +209,7 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
       ajustarDistribucion(
         prev.map((item) => ({ ...item, editado: false })),
         totalSeleccionado,
+        mediosPago,
       ),
     );
   };
@@ -239,11 +258,25 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
       }
 
       if (socio) {
+        // Registrar generación de recibo en auditoría
+        try {
+          await apiService.registrarExportacion('pagos', 'PDF', {
+            tipo: 'recibo',
+            socioId: socio.id,
+            numeroSocio: socio.numeroSocio,
+            total: totalSeleccionado,
+            cuotas: ids.length,
+          });
+        } catch (err) {
+          console.warn('No se pudo registrar la generación de recibo en auditoría:', err);
+        }
+
         const reciboGenerado = generarRecibo({
           socio,
           medios: descripcionMedios,
           cuotas: cuotasPendientes.filter((cuota) => ids.includes(cuota.id)),
           total: totalSeleccionado,
+          nombreClub,
         });
         if (reciboGenerado) {
           setUltimoRecibo({
@@ -254,9 +287,10 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
         }
       }
 
-      setAlerta({ tipo: 'info', texto: 'El cobro se registró correctamente.' });
+          setAlerta({ tipo: 'info', texto: 'El cobro se registró correctamente.' });
       setCuotasSeleccionadas(new Set());
-      setMediosSeleccionados([{ medio: 'Efectivo', monto: 0, editado: false }]);
+      const defaultMedio = mediosPago.length > 0 ? mediosPago[0].nombre : 'Efectivo';
+      setMediosSeleccionados([{ medio: defaultMedio, monto: 0, editado: false }]);
       setTimeout(() => {
         navigate('/socios');
       }, 1200);
@@ -288,62 +322,117 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
   return (
     <div className="registrar-pagos">
       <div className="card">
-            <div className="encabezado">
-              <button className="btn-volver" onClick={() => navigate('/socios')}>
-                ← Volver al listado de socios
-              </button>
-              <h1>Registrar Cobro</h1>
-            </div>
+        <div className="encabezado">
+          <button className="btn-volver" onClick={() => navigate('/socios')}>
+            ← Volver
+          </button>
+          <h1>Registrar Cobro</h1>
+        </div>
 
         <div className="datos-socio">
           <div>
             <span className="label">Socio:</span> {socio.apellido}, {socio.nombre}
           </div>
           <div>
-            <span className="label">Número de socio:</span> {socio.numeroSocio}
+            <span className="label">Número:</span> {socio.numeroSocio}
           </div>
           <div>
             <span className="label">Categoría:</span> {categoriaSocio?.nombre ?? 'Sin categoría'}
           </div>
         </div>
 
-        <div className="acciones-cuotas">
-          <div className="btn-group">
-            <button
-              className="btn-secundario"
-              onClick={seleccionarTodo}
-              disabled={cuotasPendientes.length === 0}
-            >
-              Seleccionar todas
-            </button>
-            <button
-              className="btn-secundario"
-              onClick={limpiarSeleccion}
-              disabled={cuotasSeleccionadas.size === 0}
-            >
-              Limpiar selección
-            </button>
+        <div className="contenido-principal">
+          <div className="columna-izquierda">
+            <div className="seccion-cuotas">
+              <div className="seccion-header">
+                <h3>Cuotas Pendientes</h3>
+                <div className="btn-group">
+                  <button
+                    className="btn-secundario"
+                    onClick={seleccionarTodo}
+                    disabled={cuotasPendientes.length === 0}
+                  >
+                    Seleccionar todas
+                  </button>
+                  <button
+                    className="btn-secundario"
+                    onClick={limpiarSeleccion}
+                    disabled={cuotasSeleccionadas.size === 0}
+                  >
+                    Limpiar
+                  </button>
+                </div>
+              </div>
+              <div className="tabla-wrapper">
+                <table className="tabla-cuotas">
+                  <thead>
+                    <tr>
+                      <th></th>
+                      <th>Mes</th>
+                      <th>Fecha Liquidación</th>
+                      <th>Monto</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cuotasPendientes.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="sin-datos">
+                          No hay cuotas pendientes para este socio.
+                        </td>
+                      </tr>
+                    ) : (
+                      cuotasPendientes.map((cuota) => (
+                        <tr key={cuota.id}>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={cuotasSeleccionadas.has(cuota.id)}
+                              onChange={() => toggleSeleccion(cuota.id)}
+                            />
+                          </td>
+                          <td>{getNombreMes(cuota.mes)}</td>
+                          <td>{cuota.fechaLiquidacion || '-'}</td>
+                          <td>${cuota.monto.toFixed(2)}</td>
+                          <td>
+                            <span className="badge badge-pendiente">Pendiente</span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
-          <div className="medio-pago">
-            <span className="label">Medios de Pago:</span>
-            <div className="opciones">
-              {MEDIOS_PAGO.map((medio) => {
-                const seleccionado = mediosSeleccionados.some((item) => item.medio === medio);
-                return (
-                  <label key={medio} className={seleccionado ? 'medio-seleccionado' : ''}>
-                    <input
-                      type="checkbox"
-                      checked={seleccionado}
-                      onChange={() => toggleMedioPago(medio)}
-                    />
-                    {medio}
-                  </label>
-                );
-              })}
-            </div>
+          <div className="columna-derecha">
+            <div className="seccion-medios">
+              <h3>Medios de Pago</h3>
+              <div className="medio-pago">
+                <div className="opciones">
+                  {mediosPago.length === 0 ? (
+                    <p style={{ color: '#718096', fontStyle: 'italic', fontSize: '0.85rem' }}>
+                      No hay medios de pago configurados.
+                    </p>
+                  ) : (
+                    mediosPago.map((medio) => {
+                      const seleccionado = mediosSeleccionados.some((item) => item.medio === medio.nombre);
+                      return (
+                        <label key={medio.id} className={seleccionado ? 'medio-seleccionado' : ''}>
+                          <input
+                            type="checkbox"
+                            checked={seleccionado}
+                            onChange={() => toggleMedioPago(medio.nombre)}
+                          />
+                          {medio.nombre}
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
 
-            <div className="montos-medios">
+                <div className="montos-medios">
               {mediosSeleccionados.map((item) => (
                 <div key={item.medio} className="medio-row">
                   <span>{item.medio}</span>
@@ -353,56 +442,19 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
                     step={0.01}
                     value={item.monto}
                     onChange={(e) => actualizarMontoMedio(item.medio, Number(e.target.value))}
+                    onFocus={(e) => e.target.select()}
                   />
                 </div>
               ))}
-              <button className="btn-secundario" onClick={recalcularDistribucion}>
-                Recalcular distribución
-              </button>
+                  <button className="btn-secundario" onClick={recalcularDistribucion}>
+                    Recalcular
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="tabla-wrapper">
-          <table className="tabla-cuotas">
-            <thead>
-              <tr>
-                <th></th>
-                <th>Mes</th>
-                <th>Fecha Liquidación</th>
-                <th>Monto</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cuotasPendientes.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="sin-datos">
-                    No hay cuotas pendientes para este socio.
-                  </td>
-                </tr>
-              ) : (
-                cuotasPendientes.map((cuota) => (
-                  <tr key={cuota.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={cuotasSeleccionadas.has(cuota.id)}
-                        onChange={() => toggleSeleccion(cuota.id)}
-                      />
-                    </td>
-                    <td>{getNombreMes(cuota.mes)}</td>
-                    <td>{cuota.fechaLiquidacion || '-'}</td>
-                    <td>${cuota.monto.toFixed(2)}</td>
-                    <td>
-                      <span className="badge badge-pendiente">Pendiente</span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
 
         <div className="resumen-pago">
           <div>
@@ -465,13 +517,14 @@ interface GenerarReciboParams {
     monto: number;
   }>;
   total: number;
+  nombreClub: string;
 }
 
-const generarRecibo = ({ socio, medios, cuotas, total }: GenerarReciboParams) => {
+const generarRecibo = ({ socio, medios, cuotas, total, nombreClub }: GenerarReciboParams) => {
   const doc = new jsPDF();
   const fechaHoy = new Date().toLocaleString('es-AR');
 
-  dibujarEncabezadoConLogo(doc);
+  dibujarEncabezadoConLogo(doc, 'portrait', nombreClub);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
@@ -507,7 +560,7 @@ const generarRecibo = ({ socio, medios, cuotas, total }: GenerarReciboParams) =>
     y += 7;
     if (y > 260) {
       doc.addPage();
-      dibujarEncabezadoConLogo(doc);
+      dibujarEncabezadoConLogo(doc, 'portrait', nombreClub);
       y = 106;
     }
   });
@@ -529,87 +582,6 @@ const generarRecibo = ({ socio, medios, cuotas, total }: GenerarReciboParams) =>
   const urlString = typeof blobUrl === 'string' ? blobUrl : blobUrl.toString();
   return { url: urlString, nombre: filename };
 };
-
-const dibujarEncabezadoConLogo = (doc: jsPDF) => {
-  // Fondo beige claro
-  doc.setFillColor(250, 248, 245);
-  doc.rect(0, 0, 210, 40, 'F');
-
-  // Posición del logo
-  const logoX = 30;
-  const logoY = 22;
-  const logoRadius = 14;
-
-  // Dibujar círculo punteado (borde con puntos cuadrados)
-  doc.setDrawColor(60, 60, 60); // Gris oscuro
-  doc.setLineWidth(0.5);
-  
-  // Dibujar puntos alrededor del círculo para simular borde punteado
-  const numPoints = 40;
-  const angleStep = (2 * Math.PI) / numPoints;
-  for (let i = 0; i < numPoints; i++) {
-    const angle = i * angleStep;
-    const x = logoX + Math.cos(angle) * logoRadius;
-    const y = logoY + Math.sin(angle) * logoRadius;
-    // Dibujar punto cuadrado pequeño
-    doc.setFillColor(60, 60, 60);
-    doc.rect(x - 0.3, y - 0.3, 0.6, 0.6, 'F');
-  }
-
-  // Texto "CLUB SOCIAL" en arco superior
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.setTextColor(60, 60, 60); // Gris oscuro
-  
-  const topText = 'CLUB SOCIAL';
-  const topRadius = logoRadius - 2;
-  const topStartAngle = Math.PI * 0.35; // Ajuste para posición superior
-  const topAngleStep = (Math.PI * 0.9) / (topText.length - 1);
-  
-  for (let i = 0; i < topText.length; i++) {
-    const angle = topStartAngle + (i * topAngleStep);
-    const x = logoX + Math.cos(angle) * topRadius;
-    const y = logoY + Math.sin(angle) * topRadius;
-    doc.text(topText[i], x, y, { align: 'center', angle: (angle * 180 / Math.PI) - 90 });
-  }
-
-  // Texto "REALICÓ" en arco inferior (ligeramente itálico)
-  const bottomText = 'REALICÓ';
-  const bottomRadius = logoRadius - 2;
-  const bottomStartAngle = Math.PI * 1.15; // Ajuste para posición inferior
-  const bottomAngleStep = (Math.PI * 0.9) / (bottomText.length - 1);
-  
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(7);
-  
-  for (let i = 0; i < bottomText.length; i++) {
-    const angle = bottomStartAngle + (i * bottomAngleStep);
-    const x = logoX + Math.cos(angle) * bottomRadius;
-    const y = logoY + Math.sin(angle) * bottomRadius;
-    doc.text(bottomText[i], x, y, { align: 'center', angle: (angle * 180 / Math.PI) - 90 });
-  }
-
-  // Letras "C" y "S" superpuestas en el centro (fuente serif, gris medio)
-  doc.setFont('times', 'bold'); // Fuente serif
-  doc.setFontSize(20);
-  doc.setTextColor(120, 120, 120); // Gris medio
-  
-  // Letra "C" (ligeramente arriba y a la izquierda)
-  doc.text('C', logoX - 3, logoY + 2, { align: 'center' });
-  
-  // Letra "S" (ligeramente abajo y a la derecha, superpuesta)
-  doc.text('S', logoX + 3, logoY - 2, { align: 'center' });
-
-  // Título del club a la derecha del logo
-  doc.setTextColor(45, 55, 72);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('CLUB SOCIAL REALICÓ', 70, 20);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.text('Recibo oficial de cobro de cuotas sociales', 70, 30);
-};
-
 
 
 

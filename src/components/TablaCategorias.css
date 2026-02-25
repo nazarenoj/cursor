@@ -5,6 +5,14 @@
   overflow: hidden;
 }
 
+.tabla-acciones-superior {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
 .tabla-wrapper {
   overflow-x: auto;
 }

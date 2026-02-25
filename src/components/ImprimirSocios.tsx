@@ -1,9 +1,15 @@
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useClubConfig } from '../contexts/ClubConfigContext';
 import { dibujarEncabezadoConLogo } from '../utils/pdfLogo';
+import { apiService } from '../services/api';
+import { useColumnPreferences } from '../hooks/useColumnPreferences';
+import { exportarSociosExcel } from '../utils/exportSociosPdf';
 import type { Socio, Categoria, FiltrosSocio } from '../types';
 import './ImprimirSocios.css';
+
+const SOCIOS_DEFAULT_VISIBLE = ['numeroSocio', 'apellido', 'nombre', 'dni', 'telefono', 'email', 'categoria', 'estado', 'acciones'];
 
 interface ImprimirSociosProps {
   socios: Socio[];
@@ -13,6 +19,8 @@ interface ImprimirSociosProps {
 }
 
 export const ImprimirSocios = ({ socios, categorias, filtros, onVolver }: ImprimirSociosProps) => {
+  const { nombreClub } = useClubConfig();
+  const { visibleColumns } = useColumnPreferences('socios', SOCIOS_DEFAULT_VISIBLE);
   const getCategoriaNombre = (categoriaId: number) => {
     const categoria = categorias.find(c => c.id === categoriaId);
     return categoria?.nombre || 'Sin categoría';
@@ -27,12 +35,20 @@ export const ImprimirSocios = ({ socios, categorias, filtros, onVolver }: Imprim
     }
   };
 
-  const handleExportarPdf = () => {
+  const handleExportarPdf = async () => {
+    // Registrar exportación en auditoría
+    try {
+      await apiService.registrarExportacion('socios', 'PDF', filtros);
+    } catch (err) {
+      // No bloquear la exportación si falla el registro
+      console.warn('No se pudo registrar la exportación en auditoría:', err);
+    }
+    
     const doc = new jsPDF({ orientation: 'landscape' });
     const fecha = new Date().toLocaleString('es-AR');
 
     // Encabezado con logo
-    dibujarEncabezadoConLogo(doc, 'landscape');
+    dibujarEncabezadoConLogo(doc, 'landscape', nombreClub);
 
     // Información del documento
     doc.setTextColor(45, 55, 72);
@@ -76,11 +92,11 @@ export const ImprimirSocios = ({ socios, categorias, filtros, onVolver }: Imprim
         socio.numeroSocio.toString(),
         socio.apellido,
         socio.nombre,
-        socio.dni,
-        formatFecha(socio.fechaNacimiento),
-        `${socio.calle} ${socio.numeroCasa}`,
-        socio.localidad,
-        socio.provincia,
+        socio.dni ?? '-',
+        formatFecha(socio.fechaNacimiento ?? ''),
+        [socio.calle, socio.numeroCasa].filter(Boolean).join(' ').trim() || '-',
+        socio.localidad ?? '-',
+        socio.provincia ?? '-',
         socio.telefono || '-',
         socio.email || '-',
         getCategoriaNombre(socio.categoriaId),
@@ -92,7 +108,7 @@ export const ImprimirSocios = ({ socios, categorias, filtros, onVolver }: Imprim
       ]),
       didDrawPage: (data) => {
         if (data.pageNumber > 1) {
-          dibujarEncabezadoConLogo(doc, 'landscape');
+          dibujarEncabezadoConLogo(doc, 'landscape', nombreClub);
         }
         const pageCount = doc.getNumberOfPages();
         const pageSize = doc.internal.pageSize;
@@ -108,6 +124,16 @@ export const ImprimirSocios = ({ socios, categorias, filtros, onVolver }: Imprim
     });
 
     doc.save(`Listado-Socios-${Date.now()}.pdf`);
+  };
+
+  const handleExportarExcel = async () => {
+    try {
+      await apiService.registrarExportacion('socios', 'Excel', filtros);
+    } catch (err) {
+      console.warn('No se pudo registrar la exportación en auditoría:', err);
+    }
+    const visibleIds = visibleColumns.filter((id) => id !== 'acciones');
+    exportarSociosExcel(socios, categorias, visibleIds.length ? visibleIds : undefined);
   };
 
   const getFiltrosTexto = () => {
@@ -131,6 +157,9 @@ export const ImprimirSocios = ({ socios, categorias, filtros, onVolver }: Imprim
       <div className="imprimir-controls no-print">
         <button onClick={handleExportarPdf} className="btn-imprimir">
           📄 Exportar PDF
+        </button>
+        <button onClick={handleExportarExcel} className="btn-imprimir btn-exportar-excel">
+          📊 Exportar Excel
         </button>
         <button onClick={onVolver} className="btn-volver">
           ← Volver
@@ -172,11 +201,11 @@ export const ImprimirSocios = ({ socios, categorias, filtros, onVolver }: Imprim
                 <td>{socio.numeroSocio}</td>
                 <td>{socio.apellido}</td>
                 <td>{socio.nombre}</td>
-                <td>{socio.dni}</td>
-                <td>{formatFecha(socio.fechaNacimiento)}</td>
-                <td>{socio.calle} {socio.numeroCasa}</td>
-                <td>{socio.localidad}</td>
-                <td>{socio.provincia}</td>
+                <td>{socio.dni ?? '-'}</td>
+                <td>{formatFecha(socio.fechaNacimiento ?? '')}</td>
+                <td>{[socio.calle, socio.numeroCasa].filter(Boolean).join(' ').trim() || '-'}</td>
+                <td>{socio.localidad ?? '-'}</td>
+                <td>{socio.provincia ?? '-'}</td>
                 <td>{socio.telefono || '-'}</td>
                 <td>{socio.email || '-'}</td>
                 <td>{getCategoriaNombre(socio.categoriaId)}</td>

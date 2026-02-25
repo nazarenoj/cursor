@@ -1,37 +1,49 @@
 .listado-pagos {
-  padding: 2rem;
-  max-width: 1200px;
+  padding: 0;
+  max-width: 1920px;
   margin: 0 auto;
 }
 
 .card {
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-  padding: 2rem;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 0.75rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 0.75rem;
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  margin-bottom: 0.21rem;
 }
 
 .header h1 {
   margin: 0;
   color: #2d3748;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  align-items: center;
 }
 
 .resumen {
   display: flex;
-  gap: 1.5rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
   color: #4a5568;
+  font-size: 0.8rem;
 }
 
 .resumen strong {
@@ -50,19 +62,19 @@
 
 .filtros-pagos {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
   align-items: end;
 }
 
 .filtro {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.25rem;
 }
 
 .filtro label {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   color: #4a5568;
   font-weight: 600;
 }
@@ -70,32 +82,32 @@
 .filtro input,
 .filtro select {
   border: 1px solid #cbd5f5;
-  border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.9rem;
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
   color: #2d3748;
 }
 
 .acciones-filtros {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
 }
 
 .btn-limpiar {
-  padding: 0.65rem 1rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background-color: #edf2f7;
   color: #1a202c;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.2s;
+  transition: background-color 0.2s;
 }
 
 .btn-limpiar:hover {
   background-color: #e2e8f0;
-  transform: translateY(-1px);
 }
 
 .btn-exportar {
@@ -138,10 +150,28 @@
   transform: none;
 }
 
-.tabla-wrapper {
-  overflow-x: auto;
-  border-radius: 10px;
+/* Misma estructura que TablaSocios: contenedor con overflow hidden + wrapper con scroll */
+.tabla-pagos-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
   border: 1px solid #e2e8f0;
+}
+
+.tabla-pagos-container .tabla-wrapper {
+  overflow: auto;
+  max-height: min(75vh, 700px);
+  position: relative;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tabla-pagos-container .tabla-acciones-superior {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
 }
 
 .tabla-pagos {
@@ -153,6 +183,9 @@
 .tabla-pagos thead {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 
 .tabla-pagos th {

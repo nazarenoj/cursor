@@ -1,9 +1,24 @@
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useClubConfig } from '../contexts/ClubConfigContext';
 import { dibujarEncabezadoConLogo } from '../utils/pdfLogo';
+import { apiService } from '../services/api';
+import { exportToExcel } from '../utils/exportExcel';
+import { useColumnPreferences } from '../hooks/useColumnPreferences';
 import type { LiquidacionCuota } from '../types';
 import './ImprimirTesoreria.css';
+
+const TESORERIA_DETALLE_IDS = [
+  'medioPago',
+  'fechaPago',
+  'numeroSocio',
+  'apellido',
+  'nombre',
+  'categoria',
+  'mesLiquidacion',
+  'monto',
+];
 
 type PagoConInfo = LiquidacionCuota & {
   mes: string;
@@ -31,12 +46,27 @@ export const ImprimirTesoreria = ({
   filtros,
   onVolver,
 }: ImprimirTesoreriaProps) => {
-  const handleExportarPdf = () => {
+  const { nombreClub } = useClubConfig();
+  const { visibleColumns } = useColumnPreferences('tesoreria-detalle', TESORERIA_DETALLE_IDS);
+  const handleExportarPdf = async () => {
+    // Registrar exportación en auditoría
+    try {
+      const totalRegistros = Object.values(pagosPorMedio).reduce((sum, pagos) => sum + pagos.length, 0);
+      await apiService.registrarExportacion('tesoreria', 'PDF', {
+        total: totalRegistros,
+        fechaDesde: filtros.fechaDesde,
+        fechaHasta: filtros.fechaHasta,
+        medioPago: filtros.medioPago,
+      });
+    } catch (error) {
+      console.error('Error al registrar exportación:', error);
+    }
+
     const doc = new jsPDF({ orientation: 'portrait' });
     const fecha = new Date().toLocaleString('es-AR');
 
     // Encabezado con logo
-    dibujarEncabezadoConLogo(doc, 'portrait');
+    dibujarEncabezadoConLogo(doc, 'portrait', nombreClub);
 
     // Título del informe
     doc.setTextColor(45, 55, 72);
@@ -83,7 +113,7 @@ export const ImprimirTesoreria = ({
       .forEach(([medio, pagosMedio]) => {
         if (yPos > 250) {
           doc.addPage();
-          dibujarEncabezadoConLogo(doc, 'portrait');
+          dibujarEncabezadoConLogo(doc, 'portrait', nombreClub);
           yPos = 48;
         }
 
@@ -123,7 +153,7 @@ export const ImprimirTesoreria = ({
             ]),
           didDrawPage: (data) => {
             if (data.pageNumber > 1 && data.cursor && data.cursor.y < 50) {
-              dibujarEncabezadoConLogo(doc, 'portrait');
+              dibujarEncabezadoConLogo(doc, 'portrait', nombreClub);
             }
             const pageCount = doc.getNumberOfPages();
             const pageSize = doc.internal.pageSize;
@@ -168,6 +198,56 @@ export const ImprimirTesoreria = ({
     return filtrosTexto.length > 0 ? filtrosTexto.join(' | ') : 'Sin filtros';
   };
 
+  const handleExportarExcel = () => {
+    const totalRegistros = Object.values(pagosPorMedio).reduce((sum, pagos) => sum + pagos.length, 0);
+    if (totalRegistros === 0) return;
+    try {
+      apiService.registrarExportacion('tesoreria', 'Excel', {
+        total: totalRegistros,
+        fechaDesde: filtros.fechaDesde,
+        fechaHasta: filtros.fechaHasta,
+        medioPago: filtros.medioPago,
+      }).catch(console.warn);
+    } catch (e) {
+      console.warn(e);
+    }
+    const ids = visibleColumns.length > 0 ? visibleColumns : TESORERIA_DETALLE_IDS;
+    const headers: Record<string, string> = {
+      medioPago: 'Medio de Pago',
+      fechaPago: 'Fecha Cobro',
+      numeroSocio: 'N° Socio',
+      apellido: 'Apellido',
+      nombre: 'Nombre',
+      categoria: 'Categoría',
+      mesLiquidacion: 'Mes Liquidación',
+      monto: 'Monto',
+    };
+    const data: Record<string, string | number>[] = [];
+    Object.entries(pagosPorMedio)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([medio, pagosMedio]) => {
+        pagosMedio
+          .sort((a, b) => (b.fechaPago || '').localeCompare(a.fechaPago || ''))
+          .forEach((pago) => {
+            const row: Record<string, string | number> = {};
+            ids.forEach((id) => {
+              if (id === 'medioPago') row[headers.medioPago] = medio;
+              else if (id === 'fechaPago') row[headers.fechaPago] = formatFecha(pago.fechaPago);
+              else if (id === 'numeroSocio') row[headers.numeroSocio] = pago.numeroSocio;
+              else if (id === 'apellido') row[headers.apellido] = pago.apellido;
+              else if (id === 'nombre') row[headers.nombre] = pago.nombre;
+              else if (id === 'categoria') row[headers.categoria] = pago.categoriaNombre;
+              else if (id === 'mesLiquidacion') row[headers.mesLiquidacion] = getNombreMes(pago.mes);
+              else if (id === 'monto') row[headers.monto] = pago.monto;
+            });
+            data.push(row);
+          });
+      });
+    if (data.length > 0 && Object.keys(data[0]).length > 0) {
+      exportToExcel(data, `Informe-Tesoreria-${Date.now()}`, 'Tesoreria');
+    }
+  };
+
   // Verificar si hay datos
   const tieneDatos = Object.keys(pagosPorMedio).length > 0;
 
@@ -177,6 +257,9 @@ export const ImprimirTesoreria = ({
         <button onClick={handleExportarPdf} className="btn-imprimir">
           📄 Exportar PDF
         </button>
+        <button onClick={handleExportarExcel} className="btn-imprimir btn-exportar-excel">
+          📊 Exportar Excel
+        </button>
         <button onClick={onVolver} className="btn-volver">
           ← Volver
         </button>
@@ -185,7 +268,7 @@ export const ImprimirTesoreria = ({
       <div className="imprimir-content">
         <div className="imprimir-header">
           <h1>Informe de Tesorería</h1>
-          <h2>Club Social y Deportivo Realicó</h2>
+          <h2>{nombreClub}</h2>
           <p className="fecha-impresion">Fecha de impresión: {format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
           <p className="filtros-aplicados">{getFiltrosTexto()}</p>
         </div>

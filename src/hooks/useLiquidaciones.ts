@@ -41,10 +41,65 @@ export const useLiquidaciones = () => {
 
   const generarLiquidacionMensual = async (
     mes: string,
-  ): Promise<{ liquidacionMensual: LiquidacionMensual; cuotas: LiquidacionCuota[] }> => {
-    const resultado = await apiService.crearLiquidacionMensual(mes);
-    setLiquidacionesMensuales((prev) => [...prev, resultado.liquidacionMensual]);
-    setLiquidacionesCuotas((prev) => [...prev, ...resultado.cuotas]);
+    socioId?: number,
+    reemplazarSiNoPagada?: boolean,
+  ): Promise<{
+    liquidacionMensual: LiquidacionMensual;
+    cuotas: LiquidacionCuota[];
+    liquidacionExistia?: boolean;
+    sociosNuevosIncluidos?: number;
+    yaExisteNoPagada?: boolean;
+    yaTeníaCuotaPagada?: boolean;
+    soloParaUnSocio?: boolean;
+  }> => {
+    const resultado = await apiService.crearLiquidacionMensual(mes, socioId, reemplazarSiNoPagada);
+    const id = resultado.liquidacionMensual.id;
+    setLiquidacionesMensuales((prev) => {
+      const existe = prev.some((lm) => lm.id === id);
+      if (existe) return prev.map((lm) => (lm.id === id ? resultado.liquidacionMensual : lm));
+      return [...prev, resultado.liquidacionMensual];
+    });
+    setLiquidacionesCuotas((prev) => {
+      const sinEsteMes = prev.filter((c) => c.liquidacionMensualId !== id);
+      return [...sinEsteMes, ...resultado.cuotas];
+    });
+    return resultado;
+  };
+
+  const generarLiquidacionesPorSocios = async (
+    socioIds: number[],
+    meses: string[],
+  ): Promise<{
+    resultados: Array<{
+      mes: string;
+      liquidacionMensual: LiquidacionMensual;
+      cuotas: LiquidacionCuota[];
+      cuotasCreadas: number;
+      cuotasExistentes: number;
+      sociosNuevosIncluidos?: number;
+    }>;
+    totalMeses: number;
+    totalCuotasCreadas: number;
+    totalSociosNuevosIncluidos?: number;
+  }> => {
+    const resultado = await apiService.crearLiquidacionesPorSocios(socioIds, meses);
+    
+    // Actualizar estado con las nuevas liquidaciones mensuales (evitar duplicados)
+    setLiquidacionesMensuales((prev) => {
+      const nuevas = resultado.resultados.map(r => r.liquidacionMensual);
+      const existentes = new Set(prev.map(lm => lm.id));
+      const sinDuplicados = nuevas.filter(lm => !existentes.has(lm.id));
+      return [...prev, ...sinDuplicados];
+    });
+    
+    // Actualizar estado con las nuevas cuotas
+    setLiquidacionesCuotas((prev) => {
+      const nuevas = resultado.resultados.flatMap(r => r.cuotas);
+      const existentes = new Set(prev.map(c => c.id));
+      const sinDuplicados = nuevas.filter(c => !existentes.has(c.id));
+      return [...prev, ...sinDuplicados];
+    });
+    
     return resultado;
   };
 
@@ -79,8 +134,18 @@ export const useLiquidaciones = () => {
     fechaPago?: string,
   ): Promise<LiquidacionCuota[]> => {
     if (ids.length === 0) return [];
-    const actualizadas = await apiService.pagarCuotas(ids, medioPago, fechaPago);
-    const mapa = new Map(actualizadas.map((cuota) => [cuota.id, cuota]));
+    const respuesta = await apiService.pagarCuotas(ids, medioPago, fechaPago);
+    // La respuesta puede ser un array o un objeto con propiedad cuotas
+    let actualizadas: LiquidacionCuota[];
+    if (Array.isArray(respuesta)) {
+      actualizadas = respuesta;
+    } else if (respuesta && typeof respuesta === 'object' && 'cuotas' in respuesta) {
+      const respuestaConCuotas = respuesta as { cuotas: LiquidacionCuota[] };
+      actualizadas = Array.isArray(respuestaConCuotas.cuotas) ? respuestaConCuotas.cuotas : [];
+    } else {
+      actualizadas = [];
+    }
+    const mapa = new Map(actualizadas.map((cuota: LiquidacionCuota) => [cuota.id, cuota]));
     setLiquidacionesCuotas((prev) =>
       prev.map((cuota) => (mapa.has(cuota.id) ? mapa.get(cuota.id)! : cuota)),
     );
@@ -125,6 +190,7 @@ export const useLiquidaciones = () => {
     loading,
     error,
     generarLiquidacionMensual,
+    generarLiquidacionesPorSocios,
     marcarComoPagado,
     marcarComoNoPagado,
     borrarLiquidacionCuota,

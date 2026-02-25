@@ -1,12 +1,47 @@
+/* ===== Design system ===== */
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  /* Primario: lo sobreescribe ClubConfig con --color-primary */
+  --color-primary: #5b6ae8;
+  --color-primary-hover: #4a5ad4;
+  --color-primary-soft: rgba(91, 106, 232, 0.12);
+  --color-primary-shadow: rgba(91, 106, 232, 0.35);
+
+  /* Superficies */
+  --surface: #f8f9fc;
+  --surface-elevated: #ffffff;
+  --surface-overlay: rgba(0, 0, 0, 0.5);
+
+  /* Texto */
+  --text-primary: #1a202c;
+  --text-secondary: #4a5568;
+  --text-muted: #718096;
+
+  /* Bordes */
+  --border: #e2e8f0;
+  --border-focus: var(--color-primary);
+
+  /* Radios */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+
+  /* Sombras */
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
+  --shadow-xl: 0 20px 50px rgba(15, 23, 42, 0.15);
+
+  /* Transiciones */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
   color-scheme: light;
-  color: #213547;
-  background-color: #f5f5f5;
-
+  color: var(--text-primary);
+  background-color: var(--surface);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -30,3 +65,195 @@ body {
   min-height: 100vh;
 }
 
+/* Tipografía base para títulos de página (compactos en listados) */
+h1, .page-title {
+  color: var(--text-primary);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Encabezados de listados: más chicos y fijos al hacer scroll (altura ~60% de la anterior) */
+.main-content .lista-header,
+.main-content .header,
+.main-content .tesoreria-header,
+.main-content .backups-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+  padding: 0.12rem 0 0.2rem 0;
+  margin-bottom: 0.24rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  min-height: 0;
+}
+
+.main-content .lista-header h1,
+.main-content .header h1,
+.main-content .tesoreria-header h1,
+.main-content .backups-header h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.15;
+  flex-shrink: 0;
+}
+
+.main-content .lista-actions,
+.main-content .header-actions,
+.main-content .backups-actions {
+  gap: 0.5rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  margin-left: auto;
+}
+
+.main-content .acciones-filtros {
+  gap: 0.5rem;
+}
+
+/* Encabezados de tabla ordenables por clic (todos los listados) */
+.main-content table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+.main-content table th.sortable:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+.main-content table th.sortable .sort-indicator {
+  margin-left: 0.2rem;
+  font-weight: bold;
+  opacity: 0.9;
+}
+
+.main-content .btn-agregar,
+.main-content .btn-imprimir,
+.main-content .btn-filtros,
+.main-content .btn-eliminar,
+.main-content .btn-exportar,
+.main-content .btn-imprimir-tesoreria {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+}
+
+.main-content .btn-exportar-excel {
+  background: #0d9488;
+  color: white;
+}
+
+.main-content .btn-exportar-excel:hover {
+  filter: brightness(1.1);
+}
+
+/* Filtros compactos en listados */
+.main-content .filtros-socios,
+.main-content .filtros-pagos,
+.main-content .filtros-tesoreria,
+.main-content .filtros-auditoria,
+.main-content .filtros-fecha,
+.main-content .filtros-grid {
+  gap: 0.5rem;
+  padding: 0.4rem 0 0.5rem 0;
+}
+
+.main-content .filtro label,
+.main-content .filtro-item label {
+  font-size: 0.75rem;
+  margin-bottom: 0.15rem;
+}
+
+.main-content .filtro input,
+.main-content .filtro select,
+.main-content .filtro-item input,
+.main-content .filtro-item select {
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+}
+
+.main-content .btn-limpiar,
+.main-content .btn-mes-rapido,
+.main-content .btn-limpiar-filtros {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+}
+
+/* Info debajo del encabezado (lista-info, resumen) más compacta */
+.main-content .lista-info,
+.main-content .resumen {
+  font-size: 0.8rem;
+  margin-bottom: 0.5rem;
+  padding: 0.2rem 0;
+}
+
+/* Barras de filtros fijas debajo del título (sticky) */
+.main-content .filtros-socios,
+.main-content .filtros-pagos,
+.main-content .filtros-tesoreria {
+  position: sticky;
+  top: 2.4rem;
+  z-index: 9;
+  background: var(--surface);
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.main-content .filtros-auditoria {
+  position: sticky;
+  top: 2.4rem;
+  z-index: 9;
+  background: var(--surface);
+  padding: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+/* Botones primarios reutilizables (cuando usen var(--color-primary)) */
+.btn-primary {
+  background-color: var(--color-primary, #5b6ae8);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-hover, #4a5ad4);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Inputs consistentes */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+select,
+textarea {
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.9rem;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}

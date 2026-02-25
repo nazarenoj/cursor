@@ -33,14 +33,26 @@ export const useSocios = () => {
     return Math.max(...socios.map((s) => s.numeroSocio)) + 1;
   };
 
-  const agregarSocio = async (socio: Omit<Socio, 'id'>): Promise<Socio> => {
-    const creado = await apiService.crearSocio(socio);
+  const agregarSocio = async (socio: Omit<Socio, 'id'>, foto?: File): Promise<Socio> => {
+    const creado = await apiService.crearSocio(socio, foto);
     setSocios(prev => [...prev, creado]);
     return creado;
   };
 
-  const modificarSocio = async (id: number, socio: Omit<Socio, 'id'>): Promise<Socio> => {
-    const actualizado = await apiService.actualizarSocio(id, socio);
+  const modificarSocio = async (id: number, socio: Omit<Socio, 'id'>, foto?: File | null): Promise<Socio> => {
+    const actualizado = await apiService.actualizarSocio(id, socio, foto);
+    setSocios(prev => prev.map(item => (item.id === id ? actualizado : item)));
+    return actualizado;
+  };
+
+  const darBajaSocio = async (id: number): Promise<Socio> => {
+    const actualizado = await apiService.darBajaSocio(id);
+    setSocios(prev => prev.map(item => (item.id === id ? actualizado : item)));
+    return actualizado;
+  };
+
+  const darAltaSocio = async (id: number): Promise<Socio> => {
+    const actualizado = await apiService.darAltaSocio(id);
     setSocios(prev => prev.map(item => (item.id === id ? actualizado : item)));
     return actualizado;
   };
@@ -71,7 +83,7 @@ export const useSocios = () => {
       }
       if (filtros.dni) {
         resultado = resultado.filter(s => 
-          s.dni.includes(filtros.dni!)
+          (s.dni ?? '').includes(filtros.dni!)
         );
       }
       if (filtros.categoriaId) {
@@ -86,12 +98,12 @@ export const useSocios = () => {
       }
       if (filtros.provincia) {
         resultado = resultado.filter(s => 
-          s.provincia.toLowerCase().includes(filtros.provincia!.toLowerCase())
+          (s.provincia ?? '').toLowerCase().includes(filtros.provincia!.toLowerCase())
         );
       }
       if (filtros.localidad) {
         resultado = resultado.filter(s => 
-          s.localidad.toLowerCase().includes(filtros.localidad!.toLowerCase())
+          (s.localidad ?? '').toLowerCase().includes(filtros.localidad!.toLowerCase())
         );
       }
     }
@@ -109,6 +121,8 @@ export const useSocios = () => {
     error,
     agregarSocio,
     modificarSocio,
+    darBajaSocio,
+    darAltaSocio,
     borrarSocio,
     listarSocios,
     getSocioById,

@@ -1,13 +1,29 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Pie } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import type { ChartOptions, TooltipItem } from 'chart.js';
 import { dibujarEncabezadoConLogo } from '../utils/pdfLogo';
+import { exportToExcel } from '../utils/exportExcel';
+import { useClubConfig } from '../contexts/ClubConfigContext';
 import { useLiquidaciones } from '../hooks/useLiquidaciones';
 import { useCategorias } from '../hooks/useCategorias';
+import { useColumnPreferences } from '../hooks/useColumnPreferences';
+import { SelectorColumnas } from './SelectorColumnas';
+import { apiService } from '../services/api';
+import type { MedioPagoDB } from '../types';
 import './ListadoPagos.css';
+
+const PAGOS_COLUMNS = [
+  { id: 'fechaPago', label: 'Fecha Pago' },
+  { id: 'socio', label: 'Socio' },
+  { id: 'mes', label: 'Mes' },
+  { id: 'monto', label: 'Monto' },
+  { id: 'medioPago', label: 'Medio de Pago' },
+  { id: 'fechaLiquidacion', label: 'Fecha Liquidación' },
+];
+const PAGOS_DEFAULT_VISIBLE = PAGOS_COLUMNS.map((c) => c.id);
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -42,8 +58,17 @@ const formatearMes = (mesString: string) => {
 };
 
 export const ListadoPagos = () => {
+  const { nombreClub } = useClubConfig();
   const { liquidacionesCuotas, liquidacionesMensuales } = useLiquidaciones();
   const { categorias } = useCategorias();
+  const [mediosPagoIngreso, setMediosPagoIngreso] = useState<MedioPagoDB[]>([]);
+
+  const { visibleColumns, setVisibleColumns, toggleColumn, loading: loadingCols } = useColumnPreferences(
+    'pagos',
+    PAGOS_DEFAULT_VISIBLE,
+  );
+  const visible = loadingCols ? PAGOS_DEFAULT_VISIBLE : visibleColumns;
+  const isVisible = (id: string) => visible.includes(id);
 
   const [filtros, setFiltros] = useState<FiltrosPagos>({
     fechaDesde: '',
@@ -54,6 +79,22 @@ export const ListadoPagos = () => {
     categoriaId: '',
   });
   const [mostrarGrafico, setMostrarGrafico] = useState(false);
+
+  useEffect(() => {
+    const loadMediosPago = async () => {
+      try {
+        const medios = await apiService.getMediosPago();
+        // Filtrar solo medios de pago para ingreso (ingreso o ambos)
+        const mediosIngreso = medios.filter(
+          (m) => m.activo && (m.tipoMovimiento === 'ingreso' || m.tipoMovimiento === 'ambos')
+        );
+        setMediosPagoIngreso(mediosIngreso);
+      } catch (err) {
+        console.error('Error al cargar medios de pago:', err);
+      }
+    };
+    loadMediosPago();
+  }, []);
 
   const cuotas = useMemo<CuotaExtendida[]>(() => {
     return liquidacionesCuotas
@@ -81,19 +122,9 @@ export const ListadoPagos = () => {
   }, [cuotas]);
 
   const mediosDisponibles = useMemo(() => {
-    const medios = new Set<string>();
-    cuotas.forEach((cuota) => {
-      if (cuota.medioPago) {
-        cuota.medioPago.split(',').forEach((segmento) => {
-          const medio = segmento.split(':')[0]?.trim();
-          if (medio) {
-            medios.add(medio);
-          }
-        });
-      }
-    });
-    return Array.from(medios.values());
-  }, [cuotas]);
+    // Usar solo los medios de pago configurados para ingreso
+    return mediosPagoIngreso.map((m) => m.nombre).sort();
+  }, [mediosPagoIngreso]);
 
   const cuotasFiltradas = useMemo(() => {
     return cuotas.filter((cuota) => {
@@ -137,6 +168,47 @@ export const ListadoPagos = () => {
     () => cuotasFiltradas.filter((cuota) => cuota.pagado),
     [cuotasFiltradas],
   );
+
+  const [ordenColumna, setOrdenColumna] = useState<{ columna: string; direccion: 'asc' | 'desc' } | null>(null);
+
+  const handleOrdenar = (columna: string) => {
+    if (ordenColumna && ordenColumna.columna === columna) {
+      setOrdenColumna({ columna, direccion: ordenColumna.direccion === 'asc' ? 'desc' : 'asc' });
+    } else {
+      setOrdenColumna({ columna, direccion: 'asc' });
+    }
+  };
+
+  const pagosOrdenados = useMemo(() => {
+    if (!ordenColumna) return pagosFiltrados;
+    const { columna, direccion } = ordenColumna;
+    return [...pagosFiltrados].sort((a, b) => {
+      let comparacion = 0;
+      switch (columna) {
+        case 'fechaPago':
+          comparacion = (a.fechaPago || '').localeCompare(b.fechaPago || '');
+          break;
+        case 'socio':
+          comparacion = `${a.apellido} ${a.nombre}`.localeCompare(`${b.apellido} ${b.nombre}`);
+          break;
+        case 'mes':
+          comparacion = a.mes.localeCompare(b.mes);
+          break;
+        case 'monto':
+          comparacion = a.monto - b.monto;
+          break;
+        case 'medioPago':
+          comparacion = (a.medioPago || '').localeCompare(b.medioPago || '');
+          break;
+        case 'fechaLiquidacion':
+          comparacion = (a.fechaLiquidacion || '').localeCompare(b.fechaLiquidacion || '');
+          break;
+        default:
+          return 0;
+      }
+      return direccion === 'asc' ? comparacion : -comparacion;
+    });
+  }, [pagosFiltrados, ordenColumna]);
 
   const totalLiquidado = useMemo(
     () => cuotasFiltradas.reduce((sum, cuota) => sum + cuota.monto, 0),
@@ -334,8 +406,11 @@ export const ListadoPagos = () => {
             >
               Limpiar filtros
             </button>
-            <button className="btn-exportar" onClick={() => exportarPagosPdf(pagosFiltrados)}>
+            <button className="btn-exportar" onClick={() => exportarPagosPdf(pagosFiltrados, nombreClub).catch(console.error)}>
               📄 Exportar PDF
+            </button>
+            <button className="btn-exportar btn-exportar-excel" onClick={() => exportarPagosExcel(pagosFiltrados, visible).catch(console.error)}>
+              📊 Exportar Excel
             </button>
             <button
               className="btn-grafico"
@@ -347,58 +422,145 @@ export const ListadoPagos = () => {
           </div>
         </div>
 
-        <div className="tabla-wrapper">
-          <table className="tabla-pagos">
+        <div className="tabla-pagos-container">
+          <div className="tabla-wrapper">
+            <div className="tabla-acciones-superior">
+              <SelectorColumnas
+                columnas={PAGOS_COLUMNS}
+                visibleIds={visible}
+                onToggle={toggleColumn}
+                onRestaurar={() => setVisibleColumns(PAGOS_DEFAULT_VISIBLE)}
+                titulo="Columnas visibles"
+              />
+            </div>
+            <table className="tabla-pagos">
             <thead>
               <tr>
-                <th>Fecha Pago</th>
-                <th>Socio</th>
-                <th>Mes</th>
-                <th>Monto</th>
-                <th>Medio de Pago</th>
-                <th>Fecha Liquidación</th>
+                {isVisible('fechaPago') && (
+                  <th
+                    className="sortable"
+                    onClick={() => handleOrdenar('fechaPago')}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    Fecha Pago
+                    {ordenColumna?.columna === 'fechaPago' && (
+                      <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                    )}
+                  </th>
+                )}
+                {isVisible('socio') && (
+                  <th
+                    className="sortable"
+                    onClick={() => handleOrdenar('socio')}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    Socio
+                    {ordenColumna?.columna === 'socio' && (
+                      <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                    )}
+                  </th>
+                )}
+                {isVisible('mes') && (
+                  <th
+                    className="sortable"
+                    onClick={() => handleOrdenar('mes')}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    Mes
+                    {ordenColumna?.columna === 'mes' && (
+                      <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                    )}
+                  </th>
+                )}
+                {isVisible('monto') && (
+                  <th
+                    className="sortable"
+                    onClick={() => handleOrdenar('monto')}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    Monto
+                    {ordenColumna?.columna === 'monto' && (
+                      <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                    )}
+                  </th>
+                )}
+                {isVisible('medioPago') && (
+                  <th
+                    className="sortable"
+                    onClick={() => handleOrdenar('medioPago')}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    Medio de Pago
+                    {ordenColumna?.columna === 'medioPago' && (
+                      <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                    )}
+                  </th>
+                )}
+                {isVisible('fechaLiquidacion') && (
+                  <th
+                    className="sortable"
+                    onClick={() => handleOrdenar('fechaLiquidacion')}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    Fecha Liquidación
+                    {ordenColumna?.columna === 'fechaLiquidacion' && (
+                      <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                    )}
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
               {pagosFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="sin-datos">
+                  <td colSpan={visible.length || 6} className="sin-datos">
                     No hay cobros registrados todavía.
                   </td>
                 </tr>
               ) : (
-                pagosFiltrados.map((pago) => (
+                pagosOrdenados.map((pago) => (
                   <tr key={pago.id}>
-                    <td>{pago.fechaPago || '-'}</td>
-                    <td>
-                      {pago.numeroSocio} - {pago.apellido}, {pago.nombre}
-                    </td>
-                    <td>{formatearMes(pago.mes)}</td>
-                    <td>${pago.monto.toFixed(2)}</td>
-                    <td>{pago.medioPago ?? '-'}</td>
-                    <td>{pago.fechaLiquidacion || '-'}</td>
+                    {isVisible('fechaPago') && <td>{pago.fechaPago || '-'}</td>}
+                    {isVisible('socio') && (
+                      <td>
+                        {pago.numeroSocio} - {pago.apellido}, {pago.nombre}
+                      </td>
+                    )}
+                    {isVisible('mes') && <td>{formatearMes(pago.mes)}</td>}
+                    {isVisible('monto') && <td>${pago.monto.toFixed(2)}</td>}
+                    {isVisible('medioPago') && <td>{pago.medioPago ?? '-'}</td>}
+                    {isVisible('fechaLiquidacion') && <td>{pago.fechaLiquidacion || '-'}</td>}
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-const exportarPagosPdf = (pagos: CuotaExtendida[]) => {
+const exportarPagosPdf = async (pagos: CuotaExtendida[], nombreClub: string) => {
   if (pagos.length === 0) {
     alert('No hay cobros para exportar.');
     return;
+  }
+
+  // Registrar exportación en auditoría
+  try {
+    await apiService.registrarExportacion('pagos', 'PDF', { total: pagos.length });
+  } catch (err) {
+    // No bloquear la exportación si falla el registro
+    console.warn('No se pudo registrar la exportación en auditoría:', err);
   }
 
   const doc = new jsPDF({ orientation: 'landscape' });
   const fecha = new Date().toLocaleString('es-AR');
 
   // Encabezado con logo
-  dibujarEncabezadoConLogo(doc, 'landscape');
+  dibujarEncabezadoConLogo(doc, 'landscape', nombreClub);
 
   // Información del documento
   doc.setTextColor(45, 55, 72);
@@ -440,7 +602,7 @@ const exportarPagosPdf = (pagos: CuotaExtendida[]) => {
     ]),
     didDrawPage: (data) => {
       if (data.pageNumber > 1) {
-        dibujarEncabezadoConLogo(doc, 'landscape');
+        dibujarEncabezadoConLogo(doc, 'landscape', nombreClub);
       }
       const pageCount = doc.getNumberOfPages();
       const pageSize = doc.internal.pageSize;
@@ -456,6 +618,44 @@ const exportarPagosPdf = (pagos: CuotaExtendida[]) => {
   });
 
   doc.save(`Listado-Cobros-${Date.now()}.pdf`);
+};
+
+const exportarPagosExcel = async (pagos: CuotaExtendida[], visibleColumnIds: string[]) => {
+  if (pagos.length === 0) {
+    alert('No hay cobros para exportar.');
+    return;
+  }
+  try {
+    await apiService.registrarExportacion('pagos', 'Excel', { total: pagos.length });
+  } catch (err) {
+    console.warn('No se pudo registrar la exportación en auditoría:', err);
+  }
+  const columnMap: Record<string, (p: CuotaExtendida) => string | number> = {
+    fechaPago: (p) => p.fechaPago || '-',
+    socio: (p) => `${p.numeroSocio} - ${p.apellido}, ${p.nombre}`,
+    mes: (p) => formatearMes(p.mes),
+    monto: (p) => p.monto,
+    medioPago: (p) => p.medioPago ?? '-',
+    fechaLiquidacion: (p) => p.fechaLiquidacion || '-',
+  };
+  const headers: Record<string, string> = {
+    fechaPago: 'Fecha Pago',
+    socio: 'Socio',
+    mes: 'Mes',
+    monto: 'Monto',
+    medioPago: 'Medio de Pago',
+    fechaLiquidacion: 'Fecha Liquidación',
+  };
+  const ids = visibleColumnIds.length > 0 ? visibleColumnIds : Object.keys(columnMap);
+  const data = pagos.map((pago) => {
+    const row: Record<string, string | number> = {};
+    ids.forEach((id) => {
+      if (columnMap[id] && headers[id]) row[headers[id]] = columnMap[id](pago);
+    });
+    return row;
+  });
+  if (Object.keys(data[0] || {}).length === 0) return;
+  exportToExcel(data, `Listado-Cobros-${Date.now()}`, 'Cobros');
 };
 
 

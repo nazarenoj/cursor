@@ -1,34 +1,39 @@
 .tabla-socios-container {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 
-.tabla-wrapper {
-  overflow-x: auto;
+.tabla-socios-container .tabla-wrapper {
+  overflow: auto;
+  max-height: min(75vh, 700px);
+  position: relative;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tabla-acciones-superior {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.5rem;
 }
 
 .btn-exportar {
   padding: 0.6rem 1.2rem;
   border: none;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: var(--radius-md);
+  background: var(--color-primary, #5b6ae8);
   color: white;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .btn-exportar:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.25);
+  box-shadow: 0 6px 16px var(--color-primary-shadow);
 }
 
 .tabla-socios {
@@ -38,8 +43,11 @@
 }
 
 .tabla-socios thead {
-  background-color: #667eea;
+  background: linear-gradient(135deg, var(--color-primary, #5b6ae8) 0%, color-mix(in srgb, var(--color-primary, #5b6ae8) 88%, black) 100%);
   color: white;
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 
 .tabla-socios th {
@@ -49,13 +57,52 @@
   white-space: nowrap;
 }
 
+.tabla-socios th.columna-nombre,
+.tabla-socios td.columna-nombre {
+  min-width: 200px;
+  max-width: 300px;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.tabla-socios th.sortable {
+  position: relative;
+  transition: background-color 0.2s;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tabla-socios th.sortable:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.tabla-socios th.sortable .sort-indicator {
+  margin-left: 0.25rem;
+  color: #fff;
+  font-weight: bold;
+  opacity: 0.9;
+}
+
+.tabla-socios th.filterable {
+  position: relative;
+}
+
+.tabla-socios th.filterable .filter-indicator {
+  margin-left: 0.25rem;
+  color: #fff;
+  font-weight: normal;
+  opacity: 0.85;
+  font-size: 0.85em;
+}
+
 .tabla-socios td {
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border);
+  position: relative;
 }
 
 .tabla-socios tbody tr:hover {
-  background-color: #f5f5f5;
+  background-color: var(--surface);
 }
 
 .tabla-socios tbody tr.inactivo {
@@ -92,17 +139,35 @@
   background: none;
   cursor: pointer;
   font-size: 1.2rem;
-  transition: transform 0.2s;
-  border-radius: 4px;
+  transition: transform var(--transition-fast), background-color var(--transition-fast);
+  border-radius: var(--radius-sm);
 }
 
 .btn-accion:hover {
-  transform: scale(1.2);
-  background-color: #f0f0f0;
+  transform: scale(1.12);
+  background-color: var(--border);
 }
 
 .btn-modificar:hover {
   background-color: #e3f2fd;
+}
+
+.btn-dar-baja {
+  color: #f6ad55;
+}
+
+.btn-dar-baja:hover {
+  background-color: #fff5e6;
+  color: #ed8936;
+}
+
+.btn-dar-alta {
+  color: #48bb78;
+}
+
+.btn-dar-alta:hover {
+  background-color: #f0fff4;
+  color: #38a169;
 }
 
 .btn-borrar:hover {
@@ -110,7 +175,7 @@
 }
 
 .btn-liquidaciones {
-  color: #667eea;
+  color: var(--color-primary, #5b6ae8);
 }
 
 .btn-liquidaciones:hover {
@@ -126,12 +191,12 @@
 }
 
 .tabla-vacia {
-  background: white;
-  border-radius: 8px;
+  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
   padding: 3rem;
   text-align: center;
-  color: #666;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: var(--text-muted);
+  box-shadow: var(--shadow-sm);
 }
 
 @media (max-width: 768px) {

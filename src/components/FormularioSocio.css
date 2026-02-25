@@ -5,6 +5,9 @@
   background: white;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  min-height: auto;
+  position: relative;
 }
 
 .formulario-socio h2 {
@@ -14,10 +17,51 @@
 }
 
 .form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.form-section-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.25rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 2px solid #667eea;
+}
+
+.form-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2rem;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.form-row-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.form-row-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.form-row-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.form-row-1 {
+  grid-template-columns: 1fr;
 }
 
 .form-group {
@@ -26,19 +70,122 @@
 }
 
 .form-group label {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.3rem;
   font-weight: 500;
   color: #555;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
 .form-group input,
 .form-group select {
-  padding: 0.75rem;
+  padding: 0.45rem 0.6rem;
   border: 1px solid #ddd;
   border-radius: 4px;
-  font-size: 1rem;
+  font-size: 0.85rem;
   transition: border-color 0.2s;
+}
+
+/* Tamaños de campos según su contenido */
+.form-group-compact {
+  max-width: 150px;
+}
+
+.input-compact {
+  max-width: 150px;
+}
+
+.form-group-medium {
+  max-width: 250px;
+}
+
+.input-medium {
+  max-width: 250px;
+}
+
+.form-group-large {
+  max-width: 350px;
+}
+
+.input-large {
+  max-width: 350px;
+}
+
+.localidad-otra-input {
+  margin-top: 0.4rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  width: 100%;
+  max-width: 250px;
+}
+
+.form-nueva-localidad {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: #f0f4ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.form-nueva-localidad .localidad-otra-input {
+  margin-top: 0;
+  flex: 1;
+  min-width: 140px;
+}
+
+.input-cp {
+  width: 100px;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.form-nueva-localidad-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-agregar-localidad {
+  padding: 0.4rem 0.8rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-agregar-localidad:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-cancelar-localidad {
+  padding: 0.4rem 0.8rem;
+  background: #e2e8f0;
+  color: #4a5568;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.btn-cancelar-localidad:hover {
+  background: #cbd5e0;
+}
+
+.codigo-postal-label {
+  display: block;
+  margin-top: 0.25rem;
+  color: #718096;
+  font-size: 0.8rem;
 }
 
 .form-group input:focus,
@@ -48,11 +195,142 @@
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
+.form-group-full {
+  grid-column: 1 / -1;
+}
+
+.foto-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.foto-preview {
+  position: relative;
+  display: inline-block;
+  max-width: 200px;
+}
+
+.foto-preview img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 2px solid #e2e8f0;
+}
+
+.btn-eliminar-foto {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #e53e3e;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.btn-eliminar-foto:hover {
+  background: #c53030;
+}
+
+.seccion-adherentes {
+  margin-top: 0;
+}
+
+.adherentes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.adherentes-header .form-section-title {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.btn-agregar-adherente {
+  padding: 0.6rem 1.2rem;
+  background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.btn-agregar-adherente:hover {
+  transform: translateY(-2px);
+}
+
+.adherentes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.adherente-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.adherente-header-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.adherente-header-card h4 {
+  margin: 0;
+  color: #2d3748;
+  font-size: 1.1rem;
+}
+
+.btn-eliminar-adherente {
+  padding: 0.4rem 0.8rem;
+  background: #e53e3e;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.btn-eliminar-adherente:hover {
+  background: #c53030;
+}
+
+.adherente-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.adherente-fields .form-group {
+  margin-bottom: 0;
+}
+
+.adherente-fields .form-group label {
+  font-size: 0.85rem;
+  margin-bottom: 0.4rem;
+}
+
+.adherente-fields .form-group input,
+.adherente-fields .form-group select {
+  padding: 0.5rem 0.6rem;
+  font-size: 0.9rem;
+}
+
 .form-actions {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
   justify-content: flex-end;
-  padding-top: 1.5rem;
+  padding-top: 1rem;
   border-top: 1px solid #eee;
 }
 
@@ -85,8 +363,20 @@
   background-color: #e0e0e0;
 }
 
+@media (max-width: 1200px) {
+  .form-row-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .form-row-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
-  .form-grid {
+  .form-row-4,
+  .form-row-3,
+  .form-row-2 {
     grid-template-columns: 1fr;
   }
   
@@ -97,6 +387,12 @@
   .btn-submit,
   .btn-cancel {
     width: 100%;
+  }
+  
+  .adherentes-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
   }
 }
 

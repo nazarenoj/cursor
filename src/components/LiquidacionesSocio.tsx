@@ -52,14 +52,14 @@ export const LiquidacionesSocio = ({ socio, onVolver }: LiquidacionesSocioProps)
   const totalPendiente = totalMonto - totalPagado;
   const cantidadPagadas = liquidaciones.filter(l => l.pagado).length;
   return (
-    <div className="liquidaciones-socio">
+    <div className={`liquidaciones-socio${liquidaciones.length > 0 ? ' liquidaciones-socio-con-scroll' : ''}`}>
       <div className="liquidaciones-header">
         <button onClick={onVolver} className="btn-volver">
           ← Volver a Socios
         </button>
         <h1>Liquidaciones de {socio.apellido}, {socio.nombre}</h1>
         <p className="socio-info">
-          N° Socio: {socio.numeroSocio} | DNI: {socio.dni} | Categoría: {nombreCategoria}
+          N° Socio: {socio.numeroSocio} | DNI: {socio.dni ?? '-'} | Categoría: {nombreCategoria}
         </p>
       </div>
 
@@ -69,7 +69,7 @@ export const LiquidacionesSocio = ({ socio, onVolver }: LiquidacionesSocioProps)
           <p className="subtitulo">Las liquidaciones se generan desde la sección "Liquidaciones".</p>
         </div>
       ) : (
-        <>
+        <div className="liquidaciones-socio-contenido">
           <div className="resumen-liquidaciones-socio">
             <div className="resumen-item">
               <span className="resumen-label">Total Liquidado:</span>
@@ -89,7 +89,7 @@ export const LiquidacionesSocio = ({ socio, onVolver }: LiquidacionesSocioProps)
             </div>
           </div>
 
-          <div className="tabla-wrapper">
+          <div className="tabla-wrapper tabla-liquidaciones-socio-wrapper">
             <table className="tabla-liquidaciones-socio">
               <thead>
                 <tr>
@@ -119,7 +119,7 @@ export const LiquidacionesSocio = ({ socio, onVolver }: LiquidacionesSocioProps)
               </tbody>
             </table>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

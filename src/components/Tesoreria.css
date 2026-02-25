@@ -1,126 +1,132 @@
 .tesoreria {
-  padding: 2rem;
+  padding: 0;
   max-width: 1400px;
   margin: 0 auto;
 }
 
 .tesoreria-header {
-  margin-bottom: 2rem;
+  margin-bottom: 0.21rem;
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 1rem;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+  padding: 0.12rem 0 0.2rem 0;
 }
 
 .tesoreria-header h1 {
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.15rem 0;
   color: #2d3748;
-  font-size: 2rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.15;
 }
 
 .subtitle {
   color: #718096;
   margin: 0;
+  font-size: 0.75rem;
 }
 
 .header-actions {
   display: flex;
-  gap: 1rem;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  align-items: center;
 }
 
 .btn-imprimir-tesoreria {
-  padding: 0.75rem 1.5rem;
+  padding: 0.4rem 0.85rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  border-radius: 6px;
-  font-size: 1rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
   white-space: nowrap;
+  border-radius: var(--radius-sm);
 }
 
 .btn-imprimir-tesoreria:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
 .filtros-tesoreria {
   display: flex;
-  gap: 1rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
   align-items: flex-end;
-  margin-bottom: 2rem;
-  padding: 1.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 0.75rem;
   background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: 2.4rem;
+  z-index: 9;
 }
 
 .filtro-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  min-width: 180px;
+  gap: 0.25rem;
+  min-width: 140px;
 }
 
 .filtro-group label {
   font-weight: 600;
   color: #4a5568;
-  font-size: 0.9rem;
+  font-size: 0.75rem;
 }
 
 .filtro-group input,
 .filtro-group select {
-  padding: 0.75rem;
+  padding: 0.35rem 0.5rem;
   border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
   transition: border-color 0.2s;
-}
-
-.filtro-group input:focus,
-.filtro-group select:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .filtro-acciones {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.5rem;
   align-items: flex-end;
   flex-wrap: wrap;
 }
 
 .btn-mes-rapido {
-  padding: 0.75rem 1.25rem;
+  padding: 0.35rem 0.75rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  border-radius: 6px;
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
   height: fit-content;
   white-space: nowrap;
+  border-radius: var(--radius-sm);
 }
 
 .btn-mes-rapido:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
 .btn-limpiar {
-  padding: 0.75rem 1.5rem;
+  padding: 0.35rem 0.65rem;
   background: #e2e8f0;
   color: #4a5568;
   border: none;
-  border-radius: 6px;
-  font-size: 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -202,6 +208,14 @@
   font-size: 1.5rem;
 }
 
+.tabla-tesoreria .tabla-acciones-superior {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0 1rem;
+}
+
 .medio-section {
   margin-bottom: 3rem;
 }
@@ -230,8 +244,18 @@
   font-weight: 600;
 }
 
-.tabla-wrapper {
-  overflow-x: auto;
+/* Misma estructura que TablaSocios: contenedor con overflow hidden + wrapper con scroll */
+.tabla-pagos-medio-container {
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.tabla-pagos-medio-container .tabla-wrapper {
+  overflow: auto;
+  max-height: min(75vh, 700px);
+  position: relative;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tabla-pagos-medio {
@@ -242,6 +266,9 @@
 
 .tabla-pagos-medio thead {
   background: #f7fafc;
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 
 .tabla-pagos-medio th {
@@ -312,8 +339,8 @@
     gap: 0.5rem;
   }
 
-  .tabla-wrapper {
-    overflow-x: scroll;
+  .tabla-pagos-medio-container .tabla-wrapper {
+    overflow: auto;
   }
 
   .tabla-pagos-medio {

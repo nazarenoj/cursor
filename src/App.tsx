@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { ClubConfigProvider } from './contexts/ClubConfigContext';
 import { PermissionsProvider } from './contexts/PermissionsContext';
 import { PrivateRoute } from './components/PrivateRoute';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -12,14 +13,21 @@ import { LiquidacionesPage } from './pages/LiquidacionesPage';
 import { PagosPage } from './pages/PagosPage';
 import { PagosListadoPage } from './pages/PagosListadoPage';
 import { UsuariosPage } from './pages/UsuariosPage';
+import { BackupPage } from './pages/BackupPage';
 import { TesoreriaPage } from './pages/TesoreriaPage';
 import { SinPermisosPage } from './pages/SinPermisosPage';
+import { ConfiguracionClubPage } from './pages/ConfiguracionClubPage';
+import { ListaCajas } from './components/ListaCajas';
+import { ListaMediosPago } from './components/ListaMediosPago';
+import { RegistrarEgreso } from './components/RegistrarEgreso';
+import { ListaAuditoria } from './components/ListaAuditoria';
 import './App.css';
 
 function App() {
   return (
     <AuthProvider>
-      <PermissionsProvider>
+      <ClubConfigProvider>
+        <PermissionsProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -33,7 +41,7 @@ function App() {
                     <Route
                       path="/socios"
                       element={
-                        <ProtectedRoute permiso="socios">
+                        <ProtectedRoute permiso="socios.ver">
                           <SociosPage />
                         </ProtectedRoute>
                       }
@@ -41,7 +49,7 @@ function App() {
                     <Route
                       path="/categorias"
                       element={
-                        <ProtectedRoute permiso="categorias">
+                        <ProtectedRoute permiso="categorias.ver">
                           <CategoriasPage />
                         </ProtectedRoute>
                       }
@@ -49,7 +57,7 @@ function App() {
                     <Route
                       path="/liquidaciones"
                       element={
-                        <ProtectedRoute permiso="liquidaciones">
+                        <ProtectedRoute permiso="liquidaciones.ver">
                           <LiquidacionesPage />
                         </ProtectedRoute>
                       }
@@ -57,7 +65,7 @@ function App() {
                     <Route
                       path="/pagos"
                       element={
-                        <ProtectedRoute permiso="pagos">
+                        <ProtectedRoute permiso="pagos.registrar">
                           <PagosPage />
                         </ProtectedRoute>
                       }
@@ -65,7 +73,7 @@ function App() {
                     <Route
                       path="/pagos/listado"
                       element={
-                        <ProtectedRoute permiso="listado_pagos">
+                        <ProtectedRoute permiso="pagos.ver">
                           <PagosListadoPage />
                         </ProtectedRoute>
                       }
@@ -73,20 +81,68 @@ function App() {
                     <Route
                       path="/usuarios"
                       element={
-                        <ProtectedRoute permiso="usuarios">
+                        <ProtectedRoute permiso="usuarios.ver">
                           <UsuariosPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/backup"
+                      element={
+                        <ProtectedRoute permiso="backup.ver">
+                          <BackupPage />
                         </ProtectedRoute>
                       }
                     />
                     <Route
                       path="/tesoreria"
                       element={
-                        <ProtectedRoute permiso="listado_pagos">
+                        <ProtectedRoute permiso="tesoreria.ver">
                           <TesoreriaPage />
                         </ProtectedRoute>
                       }
                     />
+                    <Route
+                      path="/cajas"
+                      element={
+                        <ProtectedRoute permiso="cajas.ver">
+                          <ListaCajas />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/cajas/egresos"
+                      element={
+                        <ProtectedRoute permiso="cajas.movimientos">
+                          <RegistrarEgreso />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/medios-pago"
+                      element={
+                        <ProtectedRoute permiso="medios_pago.ver">
+                          <ListaMediosPago />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/auditoria"
+                      element={
+                        <ProtectedRoute permiso="auditoria.ver">
+                          <ListaAuditoria />
+                        </ProtectedRoute>
+                      }
+                    />
                     <Route path="/sin-permisos" element={<SinPermisosPage />} />
+                    <Route
+                      path="/configuracion-club"
+                      element={
+                        <ProtectedRoute permiso="club.configurar">
+                          <ConfiguracionClubPage />
+                        </ProtectedRoute>
+                      }
+                    />
                   </Routes>
                   </Layout>
                 </PrivateRoute>
@@ -94,7 +150,8 @@ function App() {
             />
           </Routes>
         </BrowserRouter>
-      </PermissionsProvider>
+        </PermissionsProvider>
+      </ClubConfigProvider>
     </AuthProvider>
   );
 }

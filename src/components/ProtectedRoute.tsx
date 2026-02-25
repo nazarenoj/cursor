@@ -16,8 +16,21 @@ export const ProtectedRoute = ({ children, permiso }: ProtectedRouteProps) => {
     if (!loading && !tienePermiso(permiso)) {
       // Redirigir a la primera página permitida
       const firstRoute = getFirstAllowedRoute(permisos, esAdmin);
-      console.log('ProtectedRoute: Redirigiendo a:', firstRoute, { permiso, tienePermiso: tienePermiso(permiso), permisos, esAdmin });
-      navigate(firstRoute, { replace: true });
+      console.log('ProtectedRoute: Sin permiso para', permiso, '- Redirigiendo a:', firstRoute, { tienePermiso: tienePermiso(permiso), permisos, esAdmin });
+      
+      if (firstRoute) {
+        // Si hay una ruta permitida, redirigir a ella
+        navigate(firstRoute, { replace: true });
+      } else {
+        // Si no hay ninguna ruta permitida, redirigir a sin-permisos
+        // Pero nunca para admin (admin siempre tiene permisos)
+        if (!esAdmin) {
+          navigate('/sin-permisos', { replace: true });
+        } else {
+          // Fallback para admin (nunca debería llegar aquí)
+          navigate('/socios', { replace: true });
+        }
+      }
     }
   }, [loading, tienePermiso, permiso, permisos, esAdmin, navigate]);
 

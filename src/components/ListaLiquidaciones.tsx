@@ -3,10 +3,13 @@ import { Pie } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import type { ChartOptions, TooltipItem } from 'chart.js';
 import { useLiquidaciones } from '../hooks/useLiquidaciones';
+import { useSocios } from '../hooks/useSocios';
 import { FormularioLiquidacion } from './FormularioLiquidacion';
+import { FormularioLiquidacionSocios } from './FormularioLiquidacionSocios';
 import { TablaLiquidaciones } from './TablaLiquidaciones';
 import { TablaLiquidacionesMensuales } from './TablaLiquidacionesMensuales';
 import { ImprimirLiquidaciones } from './ImprimirLiquidaciones';
+import { EnviarWhatsApp } from './EnviarWhatsApp';
 import './ListaLiquidaciones.css';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
@@ -15,25 +18,33 @@ export const ListaLiquidaciones = () => {
   const { 
     liquidacionesMensuales,
     liquidacionesCuotas,
-    generarLiquidacionMensual, 
+    generarLiquidacionMensual,
+    generarLiquidacionesPorSocios, 
     marcarComoPagado, 
     marcarComoNoPagado,
     borrarLiquidacionCuota,
     borrarLiquidacionMensual,
     listarLiquidaciones,
     getLiquidacionMensualPorMes,
+    loadLiquidaciones,
     loading: loadingLiquidaciones,
     error: errorLiquidaciones,
   } = useLiquidaciones();
+  const { socios } = useSocios();
   
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [mostrarFormularioSocios, setMostrarFormularioSocios] = useState(false);
   const [mesDetalle, setMesDetalle] = useState<string | null>(null);
   const [mesImpresion, setMesImpresion] = useState<string | null>(null);
   const [mostrarImpresion, setMostrarImpresion] = useState(false);
+  const [mostrarWhatsApp, setMostrarWhatsApp] = useState(false);
+  const [liquidacionMensualWhatsApp, setLiquidacionMensualWhatsApp] = useState<number | undefined>(undefined);
   const [error, setError] = useState<string>('');
   const [mostrarGrafico, setMostrarGrafico] = useState(false);
   const [filtroDesde, setFiltroDesde] = useState('');
   const [filtroHasta, setFiltroHasta] = useState('');
+  const [filtroMes, setFiltroMes] = useState('');
+  const [filtroSocioId, setFiltroSocioId] = useState<number | ''>('');
 
   const totalLiquidado = useMemo(
     () => liquidacionesCuotas.reduce((sum, cuota) => sum + cuota.monto, 0),
@@ -133,6 +144,7 @@ const getNombreMes = (mesString: string) => {
 
   const liquidacionesFiltradas = useMemo(() => {
     return todasLiquidaciones.filter((cuota) => {
+      // Filtro por fecha desde
       if (filtroDesde) {
         const fechaLiquidacion = cuota.fechaLiquidacion || '';
         const fechaComparar = fechaLiquidacion ? new Date(fechaLiquidacion) : null;
@@ -140,6 +152,7 @@ const getNombreMes = (mesString: string) => {
           return false;
         }
       }
+      // Filtro por fecha hasta
       if (filtroHasta) {
         const fechaLiquidacion = cuota.fechaLiquidacion || '';
         const fechaComparar = fechaLiquidacion ? new Date(fechaLiquidacion) : null;
@@ -147,24 +160,131 @@ const getNombreMes = (mesString: string) => {
           return false;
         }
       }
+      // Filtro por mes de liquidación
+      if (filtroMes) {
+        if (cuota.mes !== filtroMes) {
+          return false;
+        }
+      }
+      // Filtro por socio
+      if (filtroSocioId !== '') {
+        const socioIdNumero = Number(filtroSocioId);
+        if (cuota.socioId !== socioIdNumero) {
+          return false;
+        }
+      }
       return true;
     });
-  }, [todasLiquidaciones, filtroDesde, filtroHasta]);
+  }, [todasLiquidaciones, filtroDesde, filtroHasta, filtroMes, filtroSocioId]);
 
   const cuotasOrdenadas = useMemo(() => {
     return [...liquidacionesFiltradas].sort(ordenarPorMes);
   }, [liquidacionesFiltradas]);
 
+  // Filtrar liquidaciones mensuales basándose en los filtros
+  const liquidacionesMensualesFiltradas = useMemo(() => {
+    let filtradas = [...liquidacionesMensuales];
+    
+    // Filtro por mes de liquidación
+    if (filtroMes) {
+      filtradas = filtradas.filter(lm => lm.mes === filtroMes);
+    }
+    
+    // Filtro por socio - solo mostrar liquidaciones que tienen cuotas del socio seleccionado
+    if (filtroSocioId !== '') {
+      const socioIdNumero = Number(filtroSocioId);
+      const liquidacionesIdsConSocio = new Set(
+        cuotasOrdenadas
+          .filter(cuota => cuota.socioId === socioIdNumero)
+          .map(cuota => cuota.liquidacionMensualId)
+      );
+      filtradas = filtradas.filter(lm => liquidacionesIdsConSocio.has(lm.id));
+    }
+    
+    // Filtro por fecha desde
+    if (filtroDesde) {
+      filtradas = filtradas.filter(lm => {
+        if (!lm.fechaLiquidacion) return false;
+        const fechaComparar = new Date(lm.fechaLiquidacion);
+        return fechaComparar >= new Date(filtroDesde);
+      });
+    }
+    
+    // Filtro por fecha hasta
+    if (filtroHasta) {
+      filtradas = filtradas.filter(lm => {
+        if (!lm.fechaLiquidacion) return false;
+        const fechaComparar = new Date(lm.fechaLiquidacion);
+        return fechaComparar <= new Date(filtroHasta);
+      });
+    }
+    
+    return filtradas;
+  }, [liquidacionesMensuales, filtroMes, filtroSocioId, filtroDesde, filtroHasta, cuotasOrdenadas]);
+
   const obtenerCuotasPorMes = (mes: string) => cuotasOrdenadas.filter(l => l.mes === mes);
 
-  const handleGenerar = async (mes: string) => {
+  const handleGenerar = async (mes: string, reemplazarSiNoPagada?: boolean) => {
+    const socioId = filtroSocioId !== '' ? Number(filtroSocioId) : undefined;
     try {
       setError('');
-      await generarLiquidacionMensual(mes);
+      const resultado = await generarLiquidacionMensual(mes, socioId, reemplazarSiNoPagada);
+
+      if (resultado.yaExisteNoPagada && !reemplazarSiNoPagada) {
+        const confirmar = window.confirm(
+          'El socio ya tiene una liquidación para este mes (no pagada). ¿Reemplazarla por una nueva?',
+        );
+        if (confirmar) {
+          await handleGenerar(mes, true);
+        }
+        return;
+      }
+
       setMostrarFormulario(false);
-      alert(`Liquidación generada exitosamente para el mes ${mes}`);
+      let msg: string;
+      if (resultado.yaTeníaCuotaPagada) {
+        msg = `El socio ya tiene una liquidación pagada para el mes ${mes}. No se realizaron cambios.`;
+      } else if (resultado.soloParaUnSocio) {
+        msg = `Liquidación generada para el socio seleccionado (mes ${mes}).`;
+      } else if (resultado.liquidacionExistia) {
+        msg = `La liquidación del mes ${mes} ya existía.`;
+        if (resultado.sociosNuevosIncluidos != null && resultado.sociosNuevosIncluidos > 0) {
+          msg += `\nSe agregaron ${resultado.sociosNuevosIncluidos} cuota(s) para socio(s) activo(s) que no tenían.`;
+        } else {
+          msg += `\nTodos los socios activos ya tenían cuota.`;
+        }
+      } else {
+        msg = `Liquidación generada exitosamente para el mes ${mes}.\n${resultado.cuotas.length} cuota(s) creada(s).`;
+        if (resultado.sociosNuevosIncluidos != null && resultado.sociosNuevosIncluidos > 0) {
+          msg += `\n${resultado.sociosNuevosIncluidos} socio(s) activo(s) sin liquidación previa fueron incluidos.`;
+        }
+      }
+      alert(msg);
     } catch (err) {
       const mensaje = err instanceof Error ? err.message : 'Error al generar la liquidación';
+      setError(mensaje);
+      alert(mensaje);
+    }
+  };
+
+  const handleGenerarPorSocios = async (socioIds: number[], meses: string[]) => {
+    try {
+      setError('');
+      const resultado = await generarLiquidacionesPorSocios(socioIds, meses);
+      setMostrarFormularioSocios(false);
+      
+      let mensaje = `Liquidaciones generadas exitosamente:\n` +
+        `- ${resultado.totalMeses} mes(es) procesado(s)\n` +
+        `- ${resultado.totalCuotasCreadas} cuota(s) creada(s)\n` +
+        `- ${socioIds.length} socio(s) seleccionado(s)`;
+      if (resultado.totalSociosNuevosIncluidos != null && resultado.totalSociosNuevosIncluidos > 0) {
+        mensaje += `\n- ${resultado.totalSociosNuevosIncluidos} socio(s) activo(s) sin liquidación previa incluidos en los meses.`;
+      }
+      alert(mensaje);
+      // Recargar liquidaciones para mostrar las nuevas
+      await loadLiquidaciones();
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : 'Error al generar las liquidaciones';
       setError(mensaje);
       alert(mensaje);
     }
@@ -243,6 +363,16 @@ const getNombreMes = (mesString: string) => {
     setMostrarImpresion(true);
   };
 
+  const handleEnviarWhatsApp = (liquidacionMensualId?: number) => {
+    setLiquidacionMensualWhatsApp(liquidacionMensualId);
+    setMostrarWhatsApp(true);
+  };
+
+  const handleCerrarWhatsApp = () => {
+    setMostrarWhatsApp(false);
+    setLiquidacionMensualWhatsApp(undefined);
+  };
+
   if (loadingLiquidaciones) {
     return (
       <div className="lista-liquidaciones">
@@ -256,6 +386,15 @@ const getNombreMes = (mesString: string) => {
       <div className="lista-liquidaciones">
         <p className="mensaje-error">{errorLiquidaciones}</p>
       </div>
+    );
+  }
+
+  if (mostrarWhatsApp) {
+    return (
+      <EnviarWhatsApp
+        liquidacionMensualId={liquidacionMensualWhatsApp}
+        onVolver={handleCerrarWhatsApp}
+      />
     );
   }
 
@@ -276,11 +415,32 @@ const getNombreMes = (mesString: string) => {
     );
   }
 
+  if (mostrarFormularioSocios) {
+    return (
+      <div className="lista-liquidaciones">
+        <FormularioLiquidacionSocios
+          onGenerar={handleGenerarPorSocios}
+          onCancel={() => {
+            setMostrarFormularioSocios(false);
+            setError('');
+          }}
+        />
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (mostrarFormulario) {
+    const socioFiltro = filtroSocioId !== '' ? socios.find((s) => s.id === filtroSocioId) : null;
     return (
       <div className="lista-liquidaciones">
         <FormularioLiquidacion
           onGenerar={handleGenerar}
+          soloParaSocio={socioFiltro ? `${socioFiltro.apellido}, ${socioFiltro.nombre}` : undefined}
           onCancel={() => {
             setMostrarFormulario(false);
             setError('');
@@ -300,7 +460,7 @@ const getNombreMes = (mesString: string) => {
     const nombreMesDetalle = getNombreMes(mesDetalle);
 
     return (
-      <div className="lista-liquidaciones">
+      <div className="lista-liquidaciones lista-liquidaciones-detalle">
         <div className="lista-header">
           <h1>Detalle de Liquidación - {nombreMesDetalle}</h1>
           <div className="lista-actions">
@@ -310,6 +470,18 @@ const getNombreMes = (mesString: string) => {
                 <button onClick={() => handleImprimirMes(mesDetalle)} className="btn-imprimir">
                   📄 Exportar PDF
                 </button>
+            {(() => {
+              const liquidacionMensual = liquidacionesMensuales.find(lm => lm.mes === mesDetalle);
+              return liquidacionMensual ? (
+                <button
+                  onClick={() => handleEnviarWhatsApp(liquidacionMensual.id)}
+                  className="btn-whatsapp"
+                  title="Enviar por WhatsApp"
+                >
+                  📱 Enviar WhatsApp
+                </button>
+              ) : null;
+            })()}
             <button
               onClick={() => handleBorrarLiquidacionMensual(mesDetalle)}
               className="btn-borrar-mes"
@@ -320,56 +492,65 @@ const getNombreMes = (mesString: string) => {
           </div>
         </div>
 
-        <TablaLiquidaciones
-          liquidaciones={detalle}
-          onMarcarPagado={handleMarcarPagado}
-          onMarcarNoPagado={handleMarcarNoPagado}
-          onBorrar={handleBorrar}
-        />
+        <div className="detalle-tabla-liquidaciones-wrapper">
+          <TablaLiquidaciones
+            liquidaciones={detalle}
+            onMarcarPagado={handleMarcarPagado}
+            onMarcarNoPagado={handleMarcarNoPagado}
+            onBorrar={handleBorrar}
+          />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="lista-liquidaciones">
+    <div className="lista-liquidaciones lista-liquidaciones-principal">
       <div className="lista-header">
         <h1>Gestión de Liquidaciones Mensuales</h1>
-        <div className="lista-actions">
-          <div className="filtros-fecha">
-            <div className="filtro">
-              <label htmlFor="liquidaciones-desde">Fecha desde</label>
-              <input
-                id="liquidaciones-desde"
-                type="date"
-                value={filtroDesde}
-                onChange={(e) => setFiltroDesde(e.target.value)}
-              />
-            </div>
-            <div className="filtro">
-              <label htmlFor="liquidaciones-hasta">Fecha hasta</label>
-              <input
-                id="liquidaciones-hasta"
-                type="date"
-                value={filtroHasta}
-                onChange={(e) => setFiltroHasta(e.target.value)}
-              />
-            </div>
+        <div className="filtros-fecha">
+          <div className="filtro">
+            <label htmlFor="liquidaciones-desde">Fecha desde</label>
+            <input
+              id="liquidaciones-desde"
+              type="date"
+              value={filtroDesde}
+              onChange={(e) => setFiltroDesde(e.target.value)}
+            />
           </div>
-          <button onClick={() => setMostrarFormulario(true)} className="btn-agregar">
-            + Generar Liquidación
-          </button>
-              {cuotasOrdenadas.length > 0 && (
-                <button onClick={() => handleImprimirMes()} className="btn-imprimir">
-                  📄 Exportar PDF
-                </button>
-              )}
-          <button
-            className="btn-grafico"
-            onClick={() => setMostrarGrafico((prev) => !prev)}
-            disabled={!graficoData}
-          >
-            📊 {mostrarGrafico ? 'Ocultar gráfico' : 'Ver gráfico'}
-          </button>
+          <div className="filtro">
+            <label htmlFor="liquidaciones-hasta">Fecha hasta</label>
+            <input
+              id="liquidaciones-hasta"
+              type="date"
+              value={filtroHasta}
+              onChange={(e) => setFiltroHasta(e.target.value)}
+            />
+          </div>
+          <div className="filtro">
+            <label htmlFor="liquidaciones-mes">Mes de liquidación</label>
+            <input
+              id="liquidaciones-mes"
+              type="month"
+              value={filtroMes}
+              onChange={(e) => setFiltroMes(e.target.value)}
+            />
+          </div>
+          <div className="filtro">
+            <label htmlFor="liquidaciones-socio">Socio</label>
+            <select
+              id="liquidaciones-socio"
+              value={filtroSocioId}
+              onChange={(e) => setFiltroSocioId(e.target.value === '' ? '' : Number(e.target.value))}
+            >
+              <option value="">Todos los socios</option>
+              {socios.map((socio) => (
+                <option key={socio.id} value={socio.id}>
+                  #{socio.numeroSocio} - {socio.apellido}, {socio.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -399,13 +580,43 @@ const getNombreMes = (mesString: string) => {
         </div>
       )}
 
-      <TablaLiquidacionesMensuales
-        liquidacionesMensuales={liquidacionesMensuales}
-        liquidacionesCuotas={cuotasOrdenadas}
-        onVerDetalle={handleVerDetalle}
-        onImprimir={handleImprimirMes}
-        onBorrar={handleBorrarLiquidacionMensual}
-      />
+      <div className="tabla-mensuales-wrapper">
+        <TablaLiquidacionesMensuales
+          liquidacionesMensuales={liquidacionesMensualesFiltradas}
+          liquidacionesCuotas={cuotasOrdenadas}
+          onVerDetalle={handleVerDetalle}
+          onImprimir={handleImprimirMes}
+          onBorrar={handleBorrarLiquidacionMensual}
+          onEnviarWhatsApp={(mes) => {
+            const liquidacionMensual = liquidacionesMensualesFiltradas.find(lm => lm.mes === mes);
+            if (liquidacionMensual) {
+              handleEnviarWhatsApp(liquidacionMensual.id);
+            }
+          }}
+          extraActions={
+            <>
+              <button onClick={() => setMostrarFormulario(true)} className="btn-agregar">
+                + Generar Liquidación Mensual
+              </button>
+              <button onClick={() => setMostrarFormularioSocios(true)} className="btn-agregar btn-agregar-socios">
+                + Generar por Socios (Resto del Año)
+              </button>
+              {cuotasOrdenadas.length > 0 && (
+                <button onClick={() => handleImprimirMes()} className="btn-imprimir">
+                  📄 Exportar PDF
+                </button>
+              )}
+              <button
+                className="btn-grafico"
+                onClick={() => setMostrarGrafico((prev) => !prev)}
+                disabled={!graficoData}
+              >
+                📊 {mostrarGrafico ? 'Ocultar gráfico' : 'Ver gráfico'}
+              </button>
+            </>
+          }
+        />
+      </div>
     </div>
   );
 };

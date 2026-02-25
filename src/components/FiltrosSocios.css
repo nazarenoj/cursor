@@ -1,91 +1,71 @@
+/* Mismo formato y ubicación que listado de cobros: barra de filtros fija sobre la tabla */
 .filtros-socios {
-  background: white;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 2rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.filtros-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.btn-toggle-filtros {
-  background: none;
-  border: none;
-  font-size: 1rem;
-  font-weight: 500;
-  color: #667eea;
-  cursor: pointer;
-  padding: 0.5rem;
-  transition: color 0.2s;
-}
-
-.btn-toggle-filtros:hover {
-  color: #5568d3;
-}
-
-.btn-limpiar {
-  padding: 0.5rem 1rem;
-  background-color: #f5f5f5;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-limpiar:hover {
-  background-color: #e0e0e0;
-}
-
-.filtros-content {
-  padding-top: 1rem;
-  border-top: 1px solid #eee;
-}
-
-.filtros-grid {
+  position: sticky;
+  top: 2.4rem;
+  z-index: 10;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+  align-items: end;
+  background: white;
+  padding: 0 0 0.4rem 0;
+  margin-bottom: 0;
 }
 
-.filtro-group {
+.filtros-socios .filtro {
   display: flex;
   flex-direction: column;
+  gap: 0.25rem;
 }
 
-.filtro-group label {
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: #555;
+.filtros-socios .filtro label {
+  font-size: 0.75rem;
+  color: #4a5568;
+  font-weight: 600;
 }
 
-.filtro-group input,
-.filtro-group select {
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  transition: border-color 0.2s;
+.filtros-socios .filtro input,
+.filtros-socios .filtro select {
+  border: 1px solid #cbd5f5;
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.5rem;
+  font-size: 0.85rem;
+  color: #2d3748;
 }
 
-.filtro-group input:focus,
-.filtro-group select:focus {
+.filtros-socios .filtro input:focus,
+.filtros-socios .filtro select:focus {
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
 }
 
+.filtros-socios .acciones-filtros {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.filtros-socios .btn-limpiar {
+  padding: 0.35rem 0.65rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background-color: #edf2f7;
+  color: #1a202c;
+  font-weight: 500;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.filtros-socios .btn-limpiar:hover {
+  background-color: #e2e8f0;
+  transform: translateY(-1px);
+}
+
 @media (max-width: 768px) {
-  .filtros-grid {
+  .filtros-socios {
     grid-template-columns: 1fr;
   }
 }
-
-
-

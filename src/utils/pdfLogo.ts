@@ -1,11 +1,16 @@
 import type jsPDF from 'jspdf';
 
 /**
- * Dibuja el encabezado con logo del Club Social en un documento PDF
+ * Dibuja el encabezado con logo del club en un documento PDF
  * @param doc - Instancia de jsPDF
  * @param orientation - Orientación del documento ('portrait' o 'landscape')
+ * @param nombreClub - Nombre del club (por defecto "Club Social Realico")
  */
-export const dibujarEncabezadoConLogo = (doc: jsPDF, orientation: 'portrait' | 'landscape' = 'portrait') => {
+export const dibujarEncabezadoConLogo = (
+  doc: jsPDF,
+  orientation: 'portrait' | 'landscape' = 'portrait',
+  nombreClub: string = 'Club Social Realico',
+) => {
   const pageWidth = orientation === 'landscape' ? 297 : 210;
   const headerHeight = orientation === 'landscape' ? 30 : 40;
 
@@ -84,12 +89,12 @@ export const dibujarEncabezadoConLogo = (doc: jsPDF, orientation: 'portrait' | '
   doc.setFontSize(orientation === 'landscape' ? 16 : 14);
   const titleX = orientation === 'landscape' ? 60 : 70;
   const titleY = orientation === 'landscape' ? 12 : 20;
-  doc.text('CLUB SOCIAL REALICÓ', titleX, titleY);
+  doc.text(nombreClub.toUpperCase(), titleX, titleY);
 
   // Subtítulo
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(orientation === 'landscape' ? 10 : 10);
   const subtitleY = orientation === 'landscape' ? 20 : 30;
-  doc.text('Club Social y Deportivo', titleX, subtitleY);
+  doc.text(nombreClub, titleX, subtitleY);
 };
 

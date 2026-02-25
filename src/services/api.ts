@@ -1,15 +1,38 @@
 import type {
+  ClubConfig,
   Categoria,
   FiltrosSocio,
   LiquidacionCuota,
   LiquidacionMensual,
+  Localidad,
+  WhatsAppTemplate,
   Socio,
   Usuario,
   LoginResponse,
   Permiso,
+  Caja,
+  MedioPagoDB,
+  MovimientoCaja,
+  Auditoria,
 } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+// Localhost: puerto 4000 en desarrollo. Producción: mismo origen + /api (Hostinger usa 3000)
+const getApiUrl = () => {
+  const hostname = window.location.hostname;
+  const protocol = window.location.protocol;
+  const port = window.location.port;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'http://localhost:4000/api';
+  }
+  if (import.meta.env.VITE_API_URL) {
+    const url = (import.meta.env.VITE_API_URL as string).trim();
+    return url.replace(/\/+$/, '') + (url.endsWith('/api') ? '' : '/api');
+  }
+  const portPart = port && port !== '80' && port !== '443' ? `:${port}` : '';
+  return `${protocol}//${hostname}${portPart}/api`;
+};
+
+const API_BASE_URL = getApiUrl();
 
 const getToken = () => {
   return localStorage.getItem('auth_token');
@@ -29,28 +52,71 @@ interface RequestOptions extends RequestInit {
 }
 
 const request = async <T = unknown>(path: string, options: RequestOptions = {}) => {
-  const { parseJson = true, requireAuth = true, headers, ...rest } = options;
+  const { parseJson = true, requireAuth = true, headers, body, ...rest } = options;
   const token = getToken();
   
-  const requestHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(headers as Record<string, string> || {}),
-  };
+  const requestHeaders: Record<string, string> = {};
+  
+  // Solo establecer Content-Type si no es FormData y hay body
+  const isFormData = body instanceof FormData;
+  if (!isFormData && body !== undefined && body !== null) {
+    requestHeaders['Content-Type'] = 'application/json';
+  }
+  
+  // Agregar headers personalizados
+  if (headers) {
+    Object.assign(requestHeaders, headers);
+  }
 
   if (requireAuth && token) {
     requestHeaders['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: requestHeaders,
+  const fetchOptions: RequestInit = {
     ...rest,
-  });
+    headers: requestHeaders,
+  };
+  
+  // Solo agregar body si está definido
+  if (body !== undefined && body !== null) {
+    if (isFormData) {
+      fetchOptions.body = body;
+    } else if (typeof body === 'string') {
+      // Si ya es un string (JSON.stringify ya aplicado), usarlo directamente
+      fetchOptions.body = body;
+    } else {
+      // Si es un objeto, serializarlo
+      fetchOptions.body = JSON.stringify(body);
+    }
+  }
+
+  // Si hay un signal en las opciones, usarlo (para timeouts)
+  if (options.signal) {
+    fetchOptions.signal = options.signal;
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, fetchOptions);
+  } catch (fetchError: any) {
+    // Si es un error de abort, lanzar un error más descriptivo
+    if (fetchError.name === 'AbortError' || fetchError.message?.includes('aborted')) {
+      throw new Error('La operación fue cancelada por timeout. Por favor, inténtalo de nuevo.');
+    }
+    // Si es un error de red, lanzar un error más descriptivo
+    if (fetchError.message?.includes('Failed to fetch') || fetchError.message?.includes('NetworkError')) {
+      throw new Error(
+        'Error de conexión con el servidor. Verifica que el backend esté ejecutándose (en la raíz del proyecto: npm run dev, o en otra terminal: cd server && npm run dev).'
+      );
+    }
+    throw fetchError;
+  }
 
   if (!response.ok) {
     let message = 'Error al comunicarse con el servidor.';
     try {
       const payload = await response.json();
-      message = payload?.message || message;
+      message = payload?.message || payload?.error || message;
     } catch {
       // Ignorar error al parsear
     }
@@ -61,7 +127,13 @@ const request = async <T = unknown>(path: string, options: RequestOptions = {}) 
     return undefined as T;
   }
 
-  return (await response.json()) as T;
+  try {
+    return (await response.json()) as T;
+  } catch (jsonError) {
+    // Si hay error al parsear JSON pero la respuesta fue OK, puede ser que el servidor no envió JSON
+    console.error('[API] Error al parsear respuesta JSON:', jsonError);
+    throw new Error('El servidor respondió pero la respuesta no es válida. Verifica los logs del servidor.');
+  }
 };
 
 const buildSociosQuery = (filtros?: FiltrosSocio): string => {
@@ -95,39 +167,139 @@ export const apiService = {
   eliminarCategoria: (id: number) =>
     request<void>(`/categorias/${id}`, { method: 'DELETE', parseJson: false }),
 
-  // Socios
-  getSocios: (filtros?: FiltrosSocio) =>
-    request<Socio[]>(`/socios${buildSociosQuery(filtros)}`),
-  crearSocio: (payload: Omit<Socio, 'id'>) =>
-    request<Socio>('/socios', {
+  // Localidades (agregadas por usuarios cuando no existen)
+  getLocalidades: (provincia: string) =>
+    request<Localidad[]>(`/localidades?provincia=${encodeURIComponent(provincia)}`),
+  crearLocalidad: (payload: { nombre: string; provincia: string; codigoPostal?: string | null }) =>
+    request<Localidad>('/localidades', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  actualizarSocio: (id: number, payload: Omit<Socio, 'id'>) =>
-    request<Socio>(`/socios/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload),
+
+  // Plantillas WhatsApp (compartidas)
+  getWhatsAppTemplates: () => request<WhatsAppTemplate[]>('/whatsapp-templates'),
+  crearWhatsAppTemplate: (payload: { nombre: string; texto: string }) =>
+    request<WhatsAppTemplate>('/whatsapp-templates', { method: 'POST', body: JSON.stringify(payload) }),
+  actualizarWhatsAppTemplate: (id: number, payload: { nombre: string; texto: string }) =>
+    request<WhatsAppTemplate>(`/whatsapp-templates/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  eliminarWhatsAppTemplate: (id: number) =>
+    request<void>(`/whatsapp-templates/${id}`, { method: 'DELETE', parseJson: false }),
+
+  // Configuración del club (nombre, logo, color)
+  getClubConfig: () => request<ClubConfig>('/club-config'),
+  getClubConfigPublic: () =>
+    request<Pick<ClubConfig, 'nombreClub' | 'logoUrl' | 'colorPrimario'>>('/club-config/public', {
+      requireAuth: false,
     }),
+  updateClubConfig: (payload: { nombreClub?: string; colorPrimario?: string; logo?: File | null }) => {
+    const formData = new FormData();
+    if (payload.nombreClub != null) formData.append('nombreClub', payload.nombreClub);
+    if (payload.colorPrimario != null) formData.append('colorPrimario', payload.colorPrimario);
+    if (payload.logo !== undefined && payload.logo !== null) formData.append('logo', payload.logo);
+    return request<ClubConfig>('/club-config', { method: 'PUT', body: formData });
+  },
+
+  // Socios
+  getSocios: (filtros?: FiltrosSocio) =>
+    request<Socio[]>(`/socios${buildSociosQuery(filtros)}`),
+  crearSocio: (payload: Omit<Socio, 'id'>, foto?: File) => {
+    const formData = new FormData();
+    if (foto) {
+      formData.append('foto', foto);
+    }
+    // Agregar todos los campos del payload al FormData
+    Object.keys(payload).forEach((key) => {
+      const value = payload[key as keyof typeof payload];
+      if (key === 'adherentes' && Array.isArray(value)) {
+        formData.append('adherentes', JSON.stringify(value));
+      } else if (value !== null && value !== undefined) {
+        formData.append(key, String(value));
+      }
+    });
+    return request<Socio>('/socios', {
+      method: 'POST',
+      body: formData,
+      headers: {}, // No establecer Content-Type, el navegador lo hará automáticamente con FormData
+    });
+  },
+  actualizarSocio: (id: number, payload: Omit<Socio, 'id'>, foto?: File | null) => {
+    const formData = new FormData();
+    if (foto !== undefined) {
+      if (foto === null) {
+        formData.append('foto', '');
+      } else {
+        formData.append('foto', foto);
+      }
+    }
+    // Agregar todos los campos del payload al FormData
+    Object.keys(payload).forEach((key) => {
+      const value = payload[key as keyof typeof payload];
+      if (key === 'adherentes' && Array.isArray(value)) {
+        formData.append('adherentes', JSON.stringify(value));
+      } else if (value !== null && value !== undefined) {
+        formData.append(key, String(value));
+      }
+    });
+    return request<Socio>(`/socios/${id}`, {
+      method: 'PUT',
+      body: formData,
+      headers: {}, // No establecer Content-Type, el navegador lo hará automáticamente con FormData
+    });
+  },
+  darBajaSocio: (id: number) =>
+    request<Socio>(`/socios/${id}/baja`, { method: 'PATCH' }),
+  darAltaSocio: (id: number) =>
+    request<Socio>(`/socios/${id}/alta`, { method: 'PATCH' }),
   eliminarSocio: (id: number) =>
     request<void>(`/socios/${id}`, { method: 'DELETE', parseJson: false }),
 
   // Liquidaciones
   getLiquidacionesMensuales: () =>
     request<LiquidacionMensual[]>('/liquidaciones-mensuales'),
-  crearLiquidacionMensual: (mes: string) =>
-    request<{ liquidacionMensual: LiquidacionMensual; cuotas: LiquidacionCuota[] }>(
-      '/liquidaciones-mensuales',
-      {
-        method: 'POST',
-        body: JSON.stringify({ mes }),
-      },
-    ),
+  crearLiquidacionMensual: (
+    mes: string,
+    socioId?: number,
+    reemplazarSiNoPagada?: boolean,
+  ) =>
+    request<{
+      liquidacionMensual: LiquidacionMensual;
+      cuotas: LiquidacionCuota[];
+      sociosNuevosIncluidos?: number;
+      liquidacionExistia?: boolean;
+      yaExisteNoPagada?: boolean;
+      yaTeníaCuotaPagada?: boolean;
+      soloParaUnSocio?: boolean;
+    }>('/liquidaciones-mensuales', {
+      method: 'POST',
+      body: JSON.stringify({
+        mes,
+        ...(socioId != null && { socioId }),
+        ...(reemplazarSiNoPagada === true && { reemplazarSiNoPagada: true }),
+      }),
+    }),
+  crearLiquidacionesPorSocios: (socioIds: number[], meses: string[]) =>
+    request<{
+      resultados: Array<{
+        mes: string;
+        liquidacionMensual: LiquidacionMensual;
+        cuotas: LiquidacionCuota[];
+        cuotasCreadas: number;
+        cuotasExistentes: number;
+        sociosNuevosIncluidos?: number;
+      }>;
+      totalMeses: number;
+      totalCuotasCreadas: number;
+      totalSociosNuevosIncluidos?: number;
+    }>('/liquidaciones-mensuales/por-socios', {
+      method: 'POST',
+      body: JSON.stringify({ socioIds, meses }),
+    }),
   eliminarLiquidacionMensual: (id: number) =>
     request<void>(`/liquidaciones-mensuales/${id}`, { method: 'DELETE', parseJson: false }),
 
   getLiquidacionesCuotas: () => request<LiquidacionCuota[]>('/liquidaciones-cuotas'),
   pagarCuotas: (ids: number[], medioPago: string, fechaPago?: string) =>
-    request<LiquidacionCuota[]>('/liquidaciones-cuotas/pagar', {
+    request<LiquidacionCuota[] | (LiquidacionCuota[] & { total?: number; cantidad?: number; medioPago?: string })>('/liquidaciones-cuotas/pagar', {
       method: 'POST',
       body: JSON.stringify({ ids, medioPago, fechaPago }),
     }),
@@ -176,6 +348,209 @@ export const apiService = {
       method: 'PUT',
       body: JSON.stringify({ permisoIds }),
     }),
+
+  // Cajas
+  getCajas: () => request<Caja[]>('/cajas'),
+  getCaja: (id: number) => request<Caja>(`/cajas/${id}`),
+  crearCaja: (payload: { nombre: string; descripcion?: string; saldoInicial?: number; activa?: boolean }) =>
+    request<Caja>('/cajas', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  actualizarCaja: (id: number, payload: Partial<{ nombre: string; descripcion: string; saldoInicial: number; activa: boolean }>) =>
+    request<Caja>(`/cajas/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  eliminarCaja: (id: number) =>
+    request<void>(`/cajas/${id}`, { method: 'DELETE', parseJson: false }),
+  getMovimientosCaja: (id: number, filtros?: { fechaDesde?: string; fechaHasta?: string; tipo?: 'ingreso' | 'egreso' }) => {
+    const params = new URLSearchParams();
+    if (filtros?.fechaDesde) params.append('fechaDesde', filtros.fechaDesde);
+    if (filtros?.fechaHasta) params.append('fechaHasta', filtros.fechaHasta);
+    if (filtros?.tipo) params.append('tipo', filtros.tipo);
+    return request<MovimientoCaja[]>(`/cajas/${id}/movimientos?${params.toString()}`);
+  },
+  registrarMovimientoCaja: (id: number, payload: { tipo: 'ingreso' | 'egreso'; monto: number; concepto: string; descripcion?: string; medioPagoId?: number; fecha?: string }) =>
+    request<MovimientoCaja>(`/cajas/${id}/movimientos`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  transferirEntreCajas: (cajaOrigenId: number, cajaDestinoId: number, payload: { monto: number; concepto: string; descripcion?: string; fecha?: string }) =>
+    request<{ movimientoOrigen: MovimientoCaja; movimientoDestino: MovimientoCaja }>('/cajas/transferir', {
+      method: 'POST',
+      body: JSON.stringify({ cajaOrigenId, cajaDestinoId, ...payload }),
+    }),
+
+  // Medios de Pago
+  getMediosPago: () => request<MedioPagoDB[]>('/medios-pago'),
+  getMedioPago: (id: number) => request<MedioPagoDB>(`/medios-pago/${id}`),
+  crearMedioPago: (payload: { nombre: string; descripcion?: string; cajaId?: number; cajasIds?: number[]; tipoMovimiento?: 'ingreso' | 'egreso' | 'ambos'; activo?: boolean }) =>
+    request<MedioPagoDB>('/medios-pago', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  actualizarMedioPago: (id: number, payload: Partial<{ nombre: string; descripcion: string; cajaId: number | null; cajasIds: number[]; tipoMovimiento: 'ingreso' | 'egreso' | 'ambos'; activo: boolean }>) =>
+    request<MedioPagoDB>(`/medios-pago/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  eliminarMedioPago: (id: number) =>
+    request<void>(`/medios-pago/${id}`, { method: 'DELETE', parseJson: false }),
+
+  // Backup
+  getBackupConfig: () =>
+    request<{
+      config: {
+        rutaBackup: string;
+        frecuencia: string;
+        rutaWinRAR: string;
+        mantenerBackups: {
+          horarios: number;
+          diarios: number;
+          semanales: number;
+          mensuales: number;
+        };
+      };
+      herramientas: {
+        winrar: { disponible: boolean; ruta: string | null };
+        mysqldump: { disponible: boolean; comando: string | null };
+      };
+    }>('/backup/config'),
+  updateBackupConfig: (config: {
+    rutaBackup?: string;
+    frecuencia?: string;
+    rutaWinRAR?: string;
+    mantenerBackups?: {
+      horarios?: number;
+      diarios?: number;
+      semanales?: number;
+      mensuales?: number;
+    };
+  }) =>
+    request<{ message: string; config: any }>('/backup/config', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    }),
+  ejecutarBackup: () =>
+    request<{
+      message: string;
+      resultado: {
+        fecha: string;
+        nombre: string;
+        ruta: string;
+        exito: boolean;
+        pasos: string[];
+        errores: string[];
+      };
+    }>('/backup/ejecutar', { method: 'POST' }),
+  listarBackups: () =>
+    request<{
+      backups: Array<{
+        nombre: string;
+        ruta: string;
+        tamaño: number;
+        fechaCreacion: string;
+        fechaModificacion: string;
+      }>;
+    }>('/backup/listar'),
+  restaurarBackup: (nombre: string) => {
+    // NO usar timeout en el frontend - el servidor maneja el timeout y siempre enviará una respuesta
+    // Usar timeout en el frontend puede causar "Failed to fetch" si el proceso tarda más de lo esperado
+    // El servidor tiene su propio timeout de 5 minutos y siempre enviará una respuesta válida
+    return request<{ message: string; resultado?: { exito: boolean; nombre: string; fecha: string; metodoUsado?: number; metodoNombre?: string; enProceso?: boolean }; error?: string }>(`/backup/restaurar/${encodeURIComponent(nombre)}`, {
+      method: 'POST',
+      // NO usar signal aquí - dejar que el servidor maneje el timeout
+    });
+  },
+  eliminarBackup: (nombre: string) =>
+    request<{ message: string; resultado: { exito: boolean; nombre: string } }>(`/backup/${encodeURIComponent(nombre)}`, {
+      method: 'DELETE',
+    }),
+
+  // Auditoría
+  getAuditoria: (filtros?: {
+    page?: number;
+    limit?: number;
+    usuario_id?: number;
+    modulo?: string;
+    accion?: string;
+    fecha_desde?: string;
+    fecha_hasta?: string;
+    resultado?: 'exitoso' | 'error';
+  }) => {
+    const params = new URLSearchParams();
+    if (filtros) {
+      Object.entries(filtros).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, String(value));
+        }
+      });
+    }
+    return request<{
+      registros: Auditoria[];
+      paginacion: {
+        pagina: number;
+        limite: number;
+        total: number;
+        totalPaginas: number;
+      };
+    }>(`/auditoria?${params.toString()}`);
+  },
+  getAuditoriaEstadisticas: () =>
+    request<{
+      accionesFrecuentes: Array<{ accion: string; cantidad: number }>;
+      modulosFrecuentes: Array<{ modulo: string; cantidad: number }>;
+      usuariosActivos: Array<{ usuario_nombre: string; cantidad: number }>;
+      actividadDiaria: Array<{ fecha: string; cantidad: number }>;
+      erroresRecientes: number;
+    }>('/auditoria/estadisticas'),
+  getAuditoriaDetalle: (id: number) => request<Auditoria>(`/auditoria/${id}`),
+  eliminarAuditoria: (filtros: {
+    usuario_id?: number;
+    modulo?: string;
+    accion?: string;
+    fecha_desde?: string;
+    fecha_hasta?: string;
+    resultado?: 'exitoso' | 'error';
+  }) => {
+    const params = new URLSearchParams();
+    Object.entries(filtros).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value));
+      }
+    });
+    return request<{ message: string; eliminados: number }>(`/auditoria?${params.toString()}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Preferencias de columnas por usuario y listado
+  getColumnPreferences: (listKey: string) =>
+    request<{ columnas: string[] | null }>(`/preferencias/columnas/${encodeURIComponent(listKey)}`),
+  saveColumnPreferences: (listKey: string, columnas: string[]) =>
+    request<{ columnas: string[] }>(`/preferencias/columnas/${encodeURIComponent(listKey)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ columnas }),
+    }),
+
+  // Registrar exportación
+  registrarExportacion: (modulo: string, tipo: string, filtros?: any) => {
+    // Mapear nombres de módulos a rutas de API
+    const rutasModulos: Record<string, string> = {
+      'socios': 'socios/exportar',
+      'categorias': 'categorias/exportar',
+      'liquidaciones': 'exportar', // El router de liquidaciones está en /api, no /api/liquidaciones
+      'pagos': 'exportar', // Los pagos se exportan desde liquidaciones (router en /api)
+      'tesoreria': 'exportar-tesoreria', // El router de liquidaciones está en /api
+      'cajas': 'cajas/exportar',
+    };
+    const ruta = rutasModulos[modulo] || `${modulo}/exportar`;
+    return request<{ message: string }>(`/${ruta}`, {
+      method: 'POST',
+      body: JSON.stringify({ tipo, filtros: { ...filtros, tipoModulo: modulo } }),
+    });
+  },
 };
 
 export { getToken, setToken, removeToken };

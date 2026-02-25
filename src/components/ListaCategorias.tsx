@@ -1,10 +1,15 @@
 import { useState } from 'react';
 import { useCategorias } from '../hooks/useCategorias';
+import { useColumnPreferences } from '../hooks/useColumnPreferences';
 import { FormularioCategoria } from './FormularioCategoria';
 import { TablaCategorias } from './TablaCategorias';
 import { ImprimirCategorias } from './ImprimirCategorias';
+import { exportToExcel } from '../utils/exportExcel';
+import { apiService } from '../services/api';
 import type { Categoria } from '../types';
 import './ListaCategorias.css';
+
+const CATEGORIAS_COLUMN_IDS = ['id', 'nombre', 'costoCuota', 'acciones'] as const;
 
 export const ListaCategorias = () => {
   const {
@@ -15,11 +20,44 @@ export const ListaCategorias = () => {
     loading,
     error,
   } = useCategorias();
+  const { visibleColumns } = useColumnPreferences('categorias', [...CATEGORIAS_COLUMN_IDS]);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [categoriaEditando, setCategoriaEditando] = useState<Categoria | undefined>(undefined);
   const [mostrarImpresion, setMostrarImpresion] = useState(false);
+  const [ordenColumna, setOrdenColumna] = useState<{ columna: string; direccion: 'asc' | 'desc' } | null>(null);
 
   const categoriasListadas = listarCategorias();
+
+  const handleOrdenar = (columna: string) => {
+    if (ordenColumna && ordenColumna.columna === columna) {
+      setOrdenColumna({
+        columna,
+        direccion: ordenColumna.direccion === 'asc' ? 'desc' : 'asc',
+      });
+    } else {
+      setOrdenColumna({ columna, direccion: 'asc' });
+    }
+  };
+
+  const categoriasOrdenadas = [...categoriasListadas].sort((a, b) => {
+    if (!ordenColumna) return 0;
+    const { columna, direccion } = ordenColumna;
+    let comparacion = 0;
+    switch (columna) {
+      case 'id':
+        comparacion = a.id - b.id;
+        break;
+      case 'nombre':
+        comparacion = a.nombre.localeCompare(b.nombre);
+        break;
+      case 'costoCuota':
+        comparacion = a.costoCuota - b.costoCuota;
+        break;
+      default:
+        return 0;
+    }
+    return direccion === 'asc' ? comparacion : -comparacion;
+  });
 
   if (loading) {
     return (
@@ -80,6 +118,31 @@ export const ListaCategorias = () => {
     setCategoriaEditando(undefined);
   };
 
+  const handleExportExcel = () => {
+    try {
+      apiService.registrarExportacion('categorias', 'Excel', { total: categoriasListadas.length }).catch(console.warn);
+      const visibleExport = visibleColumns.filter((id) => id !== 'acciones');
+      const ids = visibleExport.length ? visibleExport : ['id', 'nombre', 'costoCuota'];
+      const headers: Record<string, string> = { id: 'ID', nombre: 'Nombre', costoCuota: 'Costo Cuota' };
+      const getValue: Record<string, (c: Categoria) => string | number> = {
+        id: (c) => c.id,
+        nombre: (c) => c.nombre,
+        costoCuota: (c) => c.costoCuota,
+      };
+      const data = categoriasListadas.map((c) => {
+        const row: Record<string, string | number> = {};
+        ids.forEach((id) => {
+          if (headers[id] && getValue[id]) row[headers[id]] = getValue[id](c);
+        });
+        return row;
+      });
+      if (Object.keys(data[0] || {}).length === 0) return;
+      exportToExcel(data, `Listado-Categorias-${Date.now()}`, 'Categorías');
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'No se pudo exportar a Excel.');
+    }
+  };
+
   if (mostrarImpresion) {
     return (
       <ImprimirCategorias
@@ -112,6 +175,9 @@ export const ListaCategorias = () => {
               <button onClick={() => setMostrarImpresion(true)} className="btn-imprimir">
                 📄 Exportar PDF
               </button>
+              <button onClick={handleExportExcel} className="btn-imprimir btn-exportar-excel">
+                📊 Exportar Excel
+              </button>
         </div>
       </div>
 
@@ -120,9 +186,11 @@ export const ListaCategorias = () => {
       </div>
 
       <TablaCategorias
-        categorias={categoriasListadas}
+        categorias={categoriasOrdenadas}
         onModificar={handleModificar}
         onBorrar={handleBorrar}
+        ordenColumna={ordenColumna}
+        onOrdenar={handleOrdenar}
       />
     </div>
   );

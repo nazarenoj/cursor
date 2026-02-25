@@ -1,7 +1,10 @@
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useClubConfig } from '../contexts/ClubConfigContext';
 import { dibujarEncabezadoConLogo } from '../utils/pdfLogo';
+import { apiService } from '../services/api';
+import { exportToExcel } from '../utils/exportExcel';
 import type { LiquidacionCuota } from '../types';
 import './ImprimirLiquidaciones.css';
 
@@ -12,12 +15,24 @@ interface ImprimirLiquidacionesProps {
 }
 
 export const ImprimirLiquidaciones = ({ liquidaciones, mesFiltro, onVolver }: ImprimirLiquidacionesProps) => {
-  const handleExportarPdf = () => {
+  const { nombreClub } = useClubConfig();
+  const handleExportarPdf = async () => {
+    // Registrar exportación en auditoría
+    try {
+      await apiService.registrarExportacion('liquidaciones', 'PDF', { 
+        total: liquidaciones.length,
+        mes: mesFiltro 
+      });
+    } catch (err) {
+      // No bloquear la exportación si falla el registro
+      console.warn('No se pudo registrar la exportación en auditoría:', err);
+    }
+    
     const doc = new jsPDF({ orientation: 'landscape' });
     const fecha = new Date().toLocaleString('es-AR');
 
     // Encabezado con logo
-    dibujarEncabezadoConLogo(doc, 'landscape');
+    dibujarEncabezadoConLogo(doc, 'landscape', nombreClub);
 
     // Información del documento
     doc.setTextColor(45, 55, 72);
@@ -70,7 +85,7 @@ export const ImprimirLiquidaciones = ({ liquidaciones, mesFiltro, onVolver }: Im
       ]),
       didDrawPage: (data) => {
         if (data.pageNumber > 1) {
-          dibujarEncabezadoConLogo(doc, 'landscape');
+          dibujarEncabezadoConLogo(doc, 'landscape', nombreClub);
         }
         const pageCount = doc.getNumberOfPages();
         const pageSize = doc.internal.pageSize;
@@ -88,6 +103,28 @@ export const ImprimirLiquidaciones = ({ liquidaciones, mesFiltro, onVolver }: Im
     doc.save(`Listado-Liquidaciones-${Date.now()}.pdf`);
   };
 
+  const handleExportarExcel = () => {
+    if (liquidaciones.length === 0) return;
+    try {
+      apiService.registrarExportacion('liquidaciones', 'Excel', { total: liquidaciones.length, mes: mesFiltro }).catch(console.warn);
+    } catch (e) {
+      console.warn(e);
+    }
+    const data = liquidaciones.map((liquidacion) => ({
+      'N° Socio': liquidacion.numeroSocio,
+      Apellido: liquidacion.apellido,
+      Nombre: liquidacion.nombre,
+      Categoría: liquidacion.categoriaNombre,
+      Mes: getNombreMes(liquidacion.mes),
+      'Fecha Liquidación': formatFecha(liquidacion.fechaLiquidacion),
+      Monto: liquidacion.monto,
+      Estado: liquidacion.pagado ? 'Pagado' : 'Pendiente',
+      'Fecha Pago': formatFecha(liquidacion.fechaPago),
+      'Medio de Pago': liquidacion.medioPago ?? '-',
+    }));
+    exportToExcel(data, `Listado-Liquidaciones-${Date.now()}`, 'Liquidaciones');
+  };
+
   const formatFecha = (fecha: string | null) => {
     if (!fecha) return '-';
     try {
@@ -98,6 +135,7 @@ export const ImprimirLiquidaciones = ({ liquidaciones, mesFiltro, onVolver }: Im
   };
 
   const getNombreMes = (mesString: string) => {
+    if (!mesString) return '-';
     const [año, mes] = mesString.split('-');
     const fecha = new Date(parseInt(año), parseInt(mes) - 1, 1);
     return fecha.toLocaleString('es-AR', { month: 'long', year: 'numeric' });
@@ -112,6 +150,9 @@ export const ImprimirLiquidaciones = ({ liquidaciones, mesFiltro, onVolver }: Im
       <div className="imprimir-controls no-print">
         <button onClick={handleExportarPdf} className="btn-imprimir">
           📄 Exportar PDF
+        </button>
+        <button onClick={handleExportarExcel} className="btn-imprimir btn-exportar-excel">
+          📊 Exportar Excel
         </button>
         <button onClick={onVolver} className="btn-volver">
           ← Volver
@@ -143,10 +184,11 @@ export const ImprimirLiquidaciones = ({ liquidaciones, mesFiltro, onVolver }: Im
           </div>
         </div>
 
-        <table className="tabla-imprimir">
-          <thead>
-            <tr>
-              <th>N° Socio</th>
+        <div className="tabla-wrapper-imprimir">
+          <table className="tabla-imprimir">
+            <thead>
+              <tr>
+                <th>N° Socio</th>
               <th>Apellido</th>
               <th>Nombre</th>
               <th>Categoría</th>
@@ -174,7 +216,8 @@ export const ImprimirLiquidaciones = ({ liquidaciones, mesFiltro, onVolver }: Im
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </div>
   );

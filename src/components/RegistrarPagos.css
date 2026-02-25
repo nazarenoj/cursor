@@ -1,17 +1,24 @@
 .registrar-pagos {
-  padding: 2rem;
-  max-width: 1200px;
+  padding: 1.5rem;
+  max-width: 1400px;
   margin: 0 auto;
+  height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.card {
+.registrar-pagos .card {
   background: white;
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
-  padding: 2rem;
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .encabezado {
@@ -19,12 +26,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  flex-shrink: 0;
 }
 
 .encabezado h1 {
   margin: 0;
-  font-size: 1.8rem;
+  font-size: 1.5rem;
   color: #2d3748;
+  font-weight: 700;
 }
 
 .btn-volver {
@@ -45,12 +54,14 @@
 
 .datos-socio {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.75rem 1.5rem;
-  padding: 1rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
   border-radius: 8px;
-  background-color: #f8fafc;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   color: #2d3748;
+  border: 1px solid #e2e8f0;
+  flex-shrink: 0;
 }
 
 .label {
@@ -59,10 +70,58 @@
   margin-right: 0.5rem;
 }
 
-.acciones-cuotas {
+.contenido-principal {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 1rem;
+  flex: 1 1 auto;
+  min-height: 280px;
+}
+
+.columna-izquierda {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  min-height: 0;
+}
+
+.columna-derecha {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.seccion-cuotas {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.seccion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.seccion-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #2d3748;
+  font-weight: 600;
+}
+
+.seccion-medios {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.seccion-medios h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #2d3748;
+  font-weight: 600;
 }
 
 .btn-group {
@@ -72,14 +131,20 @@
 }
 
 .btn-secundario {
-  padding: 0.6rem 1.2rem;
+  padding: 0.5rem 1rem;
   border: none;
   border-radius: 6px;
   background-color: #edf2f7;
   color: #2d3748;
   font-weight: 500;
+  font-size: 0.875rem;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
+}
+
+.btn-secundario:hover {
+  background-color: #e2e8f0;
+  transform: translateY(-1px);
 }
 
 .btn-secundario:hover {
@@ -94,13 +159,19 @@
 .medio-pago {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
 }
 
 .medio-pago .opciones {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.75rem;
+  grid-template-columns: 1fr;
+  gap: 0.4rem;
+  max-height: 140px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fafbfc;
 }
 
 .medio-pago label {
@@ -126,10 +197,16 @@
 }
 
 .montos-medios {
-  margin-top: 1rem;
+  margin-top: 0.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fafbfc;
 }
 
 .medio-row {
@@ -137,46 +214,58 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  background-color: #f8fafc;
-  padding: 0.6rem 0.8rem;
+  background-color: white;
+  padding: 0.5rem 0.75rem;
   border-radius: 6px;
   border: 1px solid #e2e8f0;
+  font-size: 0.875rem;
 }
 
 .medio-row input {
-  width: 140px;
+  width: 120px;
   padding: 0.4rem 0.6rem;
   border-radius: 4px;
-  border: 1px solid #cbd5f5;
+  border: 1px solid #cbd5e0;
   text-align: right;
   font-weight: 600;
+  font-size: 0.875rem;
 }
 
-.tabla-wrapper {
-  overflow-x: auto;
+/* Scroll en la tabla de cuotas pendientes (no en la card) */
+.registrar-pagos .seccion-cuotas .tabla-wrapper {
+  overflow: auto;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
+  flex: 1;
+  min-height: 180px;
+  max-height: min(50vh, 480px);
+  background: white;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tabla-cuotas {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .tabla-cuotas thead {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .tabla-cuotas th {
-  padding: 0.9rem;
+  padding: 0.6rem 0.75rem;
   text-align: left;
   font-weight: 600;
+  font-size: 0.875rem;
 }
 
 .tabla-cuotas td {
-  padding: 0.75rem 0.9rem;
+  padding: 0.5rem 0.75rem;
   border-bottom: 1px solid #edf2f7;
 }
 
@@ -200,6 +289,7 @@
   color: #2b6cb0;
   padding: 0.75rem 1rem;
   border-radius: 6px;
+  flex-shrink: 0;
 }
 
 .mensaje.error {
@@ -216,6 +306,7 @@
   padding: 0.75rem 1rem;
   border-radius: 8px;
   border: 1px solid #e2e8f0;
+  flex-shrink: 0;
 }
 
 .btn-recibo {
@@ -240,14 +331,16 @@
 }
 
 .resumen-pago {
-  display: flex;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-  padding: 1rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  padding: 0.75rem 1rem;
   border-radius: 8px;
-  background-color: #f1f5f9;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
   color: #2d3748;
-  font-size: 1rem;
+  font-size: 0.9rem;
+  border: 1px solid #cbd5e0;
+  flex-shrink: 0;
 }
 
 .alerta-diferencia {
@@ -273,14 +366,19 @@
 .acciones-finales {
   display: flex;
   justify-content: flex-end;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 0.5rem;
+  flex-shrink: 0;
 }
 
 .btn-confirmar {
-  padding: 0.8rem 1.6rem;
+  padding: 0.7rem 1.5rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
   color: white;
   font-weight: 600;
+  font-size: 0.95rem;
   border-radius: 8px;
   cursor: pointer;
   transition: transform 0.2s, box-shadow 0.2s;
@@ -297,6 +395,16 @@
   box-shadow: none;
 }
 
+@media (max-width: 1200px) {
+  .contenido-principal {
+    grid-template-columns: 1fr;
+  }
+  
+  .registrar-pagos .seccion-cuotas .tabla-wrapper {
+    max-height: min(50vh, 420px);
+  }
+}
+
 @media (max-width: 768px) {
   .encabezado {
     flex-direction: column;
@@ -308,7 +416,11 @@
   }
 
   .resumen-pago {
-    flex-direction: column;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .datos-socio {
+    grid-template-columns: 1fr;
   }
 }
 

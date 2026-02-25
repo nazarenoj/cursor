@@ -1,7 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { apiService } from '../services/api';
 import './Login.css';
+
+const getLogoFullUrl = (url: string | null): string => {
+  if (!url) return '/logo.svg';
+  if (url.startsWith('http')) return url;
+  const hostname = window.location.hostname;
+  const protocol = window.location.protocol;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return `http://localhost:4000${url}`;
+  }
+  const portPart = window.location.port ? `:${window.location.port}` : '';
+  return `${protocol}//${hostname}${portPart}${url}`;
+};
 
 export const Login = () => {
   const { login } = useAuth();
@@ -10,6 +23,24 @@ export const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [config, setConfig] = useState<{
+    nombreClub: string;
+    logoUrl: string | null;
+    colorPrimario: string;
+  }>({ nombreClub: 'Club Social Realico', logoUrl: null, colorPrimario: '#667eea' });
+
+  useEffect(() => {
+    apiService
+      .getClubConfigPublic()
+      .then((data) =>
+        setConfig({
+          nombreClub: data.nombreClub ?? 'Club Social Realico',
+          logoUrl: data.logoUrl ?? null,
+          colorPrimario: data.colorPrimario ?? '#667eea',
+        }),
+      )
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,7 +49,8 @@ export const Login = () => {
 
     try {
       await login(usuario, password);
-      navigate('/socios');
+      // Redirigir a la ruta raíz, que automáticamente redirigirá a la primera ruta permitida
+      navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
     } finally {
@@ -27,10 +59,18 @@ export const Login = () => {
   };
 
   return (
-    <div className="login-container">
+    <div
+      className="login-container"
+      style={{ ['--color-primary' as string]: config.colorPrimario }}
+    >
       <div className="login-card">
         <div className="login-header">
-          <h1>Club Social Realicó</h1>
+          <img
+            src={getLogoFullUrl(config.logoUrl)}
+            alt={config.nombreClub}
+            className="login-logo"
+          />
+          <h1>{config.nombreClub}</h1>
           <p>Sistema de Gestión de Socios</p>
         </div>
         <form onSubmit={handleSubmit} className="login-form">
@@ -62,9 +102,6 @@ export const Login = () => {
             {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </button>
         </form>
-        <div className="login-footer">
-          <p>Usuario por defecto: <strong>admin</strong> / Contraseña: <strong>admin</strong></p>
-        </div>
       </div>
     </div>
   );

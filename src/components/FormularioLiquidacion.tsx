@@ -5,9 +5,11 @@ interface FormularioLiquidacionProps {
   onGenerar: (mes: string) => void;
   onCancel: () => void;
   mesActual?: string;
+  /** Si está definido, se generará la liquidación solo para este socio (filtro aplicado) */
+  soloParaSocio?: string;
 }
 
-export const FormularioLiquidacion = ({ onGenerar, onCancel, mesActual }: FormularioLiquidacionProps) => {
+export const FormularioLiquidacion = ({ onGenerar, onCancel, mesActual, soloParaSocio }: FormularioLiquidacionProps) => {
   // Obtener el mes actual en formato YYYY-MM
   const getMesActual = () => {
     const ahora = new Date();
@@ -52,12 +54,20 @@ export const FormularioLiquidacion = ({ onGenerar, onCancel, mesActual }: Formul
 
         <div className="info-box">
           <h3>⚠️ Información Importante</h3>
-          <ul>
-            <li>Se generará una liquidación para cada socio <strong>activo</strong></li>
-            <li>El monto se calculará según la categoría de cada socio</li>
-            <li>Si ya existe una liquidación para este mes, se mostrará un error</li>
-            <li>Puedes marcar las liquidaciones como pagadas después de generarlas</li>
-          </ul>
+          {soloParaSocio ? (
+            <ul>
+              <li>Se generará la liquidación <strong>solo para el socio:</strong> {soloParaSocio}</li>
+              <li>El socio debe estar activo y no tener ya una liquidación pagada para este mes</li>
+              <li>Si ya tiene una liquidación no pagada, se pedirá confirmación para reemplazarla</li>
+            </ul>
+          ) : (
+            <ul>
+              <li>Se generará una liquidación para cada socio <strong>activo</strong></li>
+              <li>El monto se calculará según la categoría de cada socio</li>
+              <li>Si ya existe liquidación para este mes, se agregarán solo los socios que no tenían</li>
+              <li>Puedes marcar las liquidaciones como pagadas después de generarlas</li>
+            </ul>
+          )}
         </div>
 
         <div className="form-actions">

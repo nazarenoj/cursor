@@ -30,22 +30,34 @@ export const PermissionsProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     try {
       const esAdminUser = user.usuario === 'admin';
-      setEsAdmin(esAdminUser);
+      console.log('cargarPermisos - Iniciando para usuario:', user.usuario, 'ID:', user.id, 'esAdmin:', esAdminUser);
       
-      // Si es admin, no necesitamos cargar permisos (tiene todos)
+      // Si es admin, establecer estado inmediatamente y no cargar permisos
       if (esAdminUser) {
+        // Establecer todos los estados de una vez para evitar problemas de timing
+        setEsAdmin(true);
         setPermisos([]); // Admin no necesita permisos explícitos
         setLoading(false);
+        console.log('Usuario admin detectado - Permisos completos - esAdmin:', true, 'Usuario:', user.usuario);
         return;
       }
 
+      // Para usuarios no admin, cargar sus permisos
+      console.log('Cargando permisos para usuario no admin:', user.usuario, 'ID:', user.id);
+      setEsAdmin(false); // Asegurar que no es admin
       const permisosData = await apiService.getPermisosUsuario(user.id);
-      console.log('Permisos cargados para usuario:', user.usuario, permisosData);
+      console.log('Permisos cargados para usuario:', user.usuario, 'Cantidad:', permisosData?.length || 0);
+      if (permisosData && permisosData.length > 0) {
+        console.log('Permisos:', permisosData.map(p => p.codigo).join(', '));
+      } else {
+        console.log('Usuario sin permisos asignados:', user.usuario);
+      }
       setPermisos(permisosData || []);
     } catch (err) {
       console.error('Error al cargar permisos:', err);
-      setPermisos([]);
+      // En caso de error, asumir que no es admin y no tiene permisos
       setEsAdmin(false);
+      setPermisos([]);
     } finally {
       setLoading(false);
     }
@@ -58,7 +70,22 @@ export const PermissionsProvider = ({ children }: { children: ReactNode }) => {
 
   const tienePermiso = (codigo: string): boolean => {
     if (esAdmin) return true;
-    return permisos.some((p) => p.codigo === codigo);
+    
+    // Verificar permiso exacto
+    if (permisos.some((p) => p.codigo === codigo)) {
+      return true;
+    }
+    
+    // Si el permiso tiene formato "modulo.accion", verificar también el permiso genérico "modulo"
+    // Esto permite que un permiso genérico (ej: "socios") otorgue acceso a todos los permisos del módulo
+    if (codigo.includes('.')) {
+      const [modulo] = codigo.split('.');
+      if (permisos.some((p) => p.codigo === modulo)) {
+        return true;
+      }
+    }
+    
+    return false;
   };
 
   return (

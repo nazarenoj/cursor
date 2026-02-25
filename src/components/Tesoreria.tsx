@@ -1,8 +1,22 @@
 import { useMemo, useState } from 'react';
 import { useLiquidaciones } from '../hooks/useLiquidaciones';
 import { useCategorias } from '../hooks/useCategorias';
+import { useColumnPreferences } from '../hooks/useColumnPreferences';
+import { SelectorColumnas } from './SelectorColumnas';
 import { ImprimirTesoreria } from './ImprimirTesoreria';
 import './Tesoreria.css';
+
+const TESORERIA_DETALLE_COLUMNS = [
+  { id: 'medioPago', label: 'Medio de Pago' },
+  { id: 'fechaPago', label: 'Fecha Pago' },
+  { id: 'numeroSocio', label: 'N° Socio' },
+  { id: 'apellido', label: 'Apellido' },
+  { id: 'nombre', label: 'Nombre' },
+  { id: 'categoria', label: 'Categoría' },
+  { id: 'mesLiquidacion', label: 'Mes Liquidación' },
+  { id: 'monto', label: 'Monto' },
+];
+const TESORERIA_DETALLE_DEFAULT = TESORERIA_DETALLE_COLUMNS.map((c) => c.id);
 
 type FiltrosTesoreria = {
   fechaDesde: string;
@@ -22,6 +36,13 @@ const MEDIOS_PAGO = [
 export const Tesoreria = () => {
   const { liquidacionesCuotas, liquidacionesMensuales } = useLiquidaciones();
   const { categorias } = useCategorias();
+
+  const { visibleColumns, setVisibleColumns, toggleColumn, loading: loadingCols } = useColumnPreferences(
+    'tesoreria-detalle',
+    TESORERIA_DETALLE_DEFAULT,
+  );
+  const visible = loadingCols ? TESORERIA_DETALLE_DEFAULT : visibleColumns;
+  const isVisible = (id: string) => visible.includes(id);
 
   const [filtros, setFiltros] = useState<FiltrosTesoreria>({
     fechaDesde: '',
@@ -277,6 +298,15 @@ export const Tesoreria = () => {
 
       <div className="tabla-tesoreria">
         <h2>Detalle de Cobros por Medio de Pago</h2>
+        <div className="tabla-acciones-superior">
+          <SelectorColumnas
+            columnas={TESORERIA_DETALLE_COLUMNS}
+            visibleIds={visible}
+            onToggle={toggleColumn}
+            onRestaurar={() => setVisibleColumns(TESORERIA_DETALLE_DEFAULT)}
+            titulo="Columnas visibles"
+          />
+        </div>
         {Object.entries(pagosPorMedio)
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([medio, pagosMedio]) => (
@@ -291,17 +321,19 @@ export const Tesoreria = () => {
                   })}
                 </span>
               </div>
-              <div className="tabla-wrapper">
-                <table className="tabla-pagos-medio">
+              <div className="tabla-pagos-medio-container">
+                <div className="tabla-wrapper">
+                  <table className="tabla-pagos-medio">
                   <thead>
                     <tr>
-                      <th>Fecha Pago</th>
-                      <th>N° Socio</th>
-                      <th>Apellido</th>
-                      <th>Nombre</th>
-                      <th>Categoría</th>
-                      <th>Mes Liquidación</th>
-                      <th>Monto</th>
+                      {isVisible('medioPago') && <th>Medio de Pago</th>}
+                      {isVisible('fechaPago') && <th>Fecha Pago</th>}
+                      {isVisible('numeroSocio') && <th>N° Socio</th>}
+                      {isVisible('apellido') && <th>Apellido</th>}
+                      {isVisible('nombre') && <th>Nombre</th>}
+                      {isVisible('categoria') && <th>Categoría</th>}
+                      {isVisible('mesLiquidacion') && <th>Mes Liquidación</th>}
+                      {isVisible('monto') && <th>Monto</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -309,22 +341,26 @@ export const Tesoreria = () => {
                       .sort((a, b) => (b.fechaPago || '').localeCompare(a.fechaPago || ''))
                       .map((pago) => (
                         <tr key={pago.id}>
-                          <td>{formatFecha(pago.fechaPago)}</td>
-                          <td>{pago.numeroSocio}</td>
-                          <td>{pago.apellido}</td>
-                          <td>{pago.nombre}</td>
-                          <td>{getCategoriaNombre(pago.categoriaId)}</td>
-                          <td>{getNombreMes(pago.mes)}</td>
-                          <td className="monto">
-                            ${pago.monto.toLocaleString('es-AR', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
+                          {isVisible('medioPago') && <td>{medio}</td>}
+                          {isVisible('fechaPago') && <td>{formatFecha(pago.fechaPago)}</td>}
+                          {isVisible('numeroSocio') && <td>{pago.numeroSocio}</td>}
+                          {isVisible('apellido') && <td>{pago.apellido}</td>}
+                          {isVisible('nombre') && <td>{pago.nombre}</td>}
+                          {isVisible('categoria') && <td>{getCategoriaNombre(pago.categoriaId)}</td>}
+                          {isVisible('mesLiquidacion') && <td>{getNombreMes(pago.mes)}</td>}
+                          {isVisible('monto') && (
+                            <td className="monto">
+                              ${pago.monto.toLocaleString('es-AR', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </td>
+                          )}
                         </tr>
                       ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           ))}

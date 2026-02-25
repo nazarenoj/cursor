@@ -102,16 +102,24 @@
   color: #333;
 }
 
+.tabla-wrapper-imprimir {
+  overflow: auto;
+  max-height: min(70vh, 600px);
+  margin-top: 1rem;
+}
+
 .tabla-imprimir {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.8rem;
-  margin-top: 1rem;
 }
 
 .tabla-imprimir thead {
   background-color: #667eea;
   color: white;
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 
 .tabla-imprimir th {
@@ -209,6 +217,11 @@
   .resumen-label,
   .resumen-valor {
     color: #000 !important;
+  }
+
+  .tabla-wrapper-imprimir {
+    overflow: visible !important;
+    max-height: none !important;
   }
 
   .tabla-imprimir {
