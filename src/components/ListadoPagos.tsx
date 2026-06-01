@@ -1,31 +1,43 @@
 import { useMemo, useState, useEffect } from 'react';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { Pie } from 'react-chartjs-2';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { Pie, Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
 import type { ChartOptions, TooltipItem } from 'chart.js';
 import { dibujarEncabezadoConLogo } from '../utils/pdfLogo';
-import { exportToExcel } from '../utils/exportExcel';
 import { useClubConfig } from '../contexts/ClubConfigContext';
 import { useLiquidaciones } from '../hooks/useLiquidaciones';
 import { useCategorias } from '../hooks/useCategorias';
 import { useColumnPreferences } from '../hooks/useColumnPreferences';
+import { useFilterPreferences } from '../hooks/useFilterPreferences';
 import { SelectorColumnas } from './SelectorColumnas';
+import { ErrorBoundary } from './ErrorBoundary';
 import { apiService } from '../services/api';
 import type { MedioPagoDB } from '../types';
+import { extractYMD, formatDateOnlyES } from '../utils/clubDateTime';
 import './ListadoPagos.css';
 
 const PAGOS_COLUMNS = [
+  { id: 'numeroRecibo', label: 'Nº Recibo' },
   { id: 'fechaPago', label: 'Fecha Pago' },
   { id: 'socio', label: 'Socio' },
   { id: 'mes', label: 'Mes' },
   { id: 'monto', label: 'Monto' },
   { id: 'medioPago', label: 'Medio de Pago' },
   { id: 'fechaLiquidacion', label: 'Fecha Liquidación' },
+  { id: 'acciones', label: 'Acciones' },
 ];
 const PAGOS_DEFAULT_VISIBLE = PAGOS_COLUMNS.map((c) => c.id);
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+const PAGOS_FILTROS = [
+  { id: 'fechaDesde', label: 'Fecha cobro desde' },
+  { id: 'fechaHasta', label: 'Fecha cobro hasta' },
+  { id: 'socio', label: 'Socio' },
+  { id: 'mes', label: 'Mes liquidado' },
+  { id: 'medioPago', label: 'Medio de pago' },
+  { id: 'categoriaId', label: 'Categoría de socio' },
+];
+const PAGOS_FILTROS_DEFAULT = PAGOS_FILTROS.map((f) => f.id);
+
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
 
 type FiltrosPagos = {
   fechaDesde: string;
@@ -48,6 +60,7 @@ type CuotaExtendida = {
   medioPago: string | null;
   categoriaId: number;
   pagado: boolean;
+  numeroRecibo?: number | null;
 };
 
 const formatearMes = (mesString: string) => {
@@ -79,6 +92,12 @@ export const ListadoPagos = () => {
     categoriaId: '',
   });
   const [mostrarGrafico, setMostrarGrafico] = useState(false);
+  const [modalGrafico, setModalGrafico] = useState<'pie' | 'barras' | null>(null);
+
+  const { visibleFilters, setVisibleFilters, toggleFilter, isFilterVisible } = useFilterPreferences(
+    'pagos-filtros',
+    PAGOS_FILTROS_DEFAULT,
+  );
 
   useEffect(() => {
     const loadMediosPago = async () => {
@@ -95,6 +114,15 @@ export const ListadoPagos = () => {
     };
     loadMediosPago();
   }, []);
+
+  useEffect(() => {
+    if (!modalGrafico) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setModalGrafico(null);
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [modalGrafico]);
 
   const cuotas = useMemo<CuotaExtendida[]>(() => {
     return liquidacionesCuotas
@@ -130,15 +158,21 @@ export const ListadoPagos = () => {
     return cuotas.filter((cuota) => {
       if (filtros.fechaDesde) {
         if (!cuota.fechaPago) return false;
-        if (new Date(cuota.fechaPago) < new Date(filtros.fechaDesde)) {
+        const ymdPago = extractYMD(cuota.fechaPago);
+        const ymdDesde = extractYMD(filtros.fechaDesde);
+        if (!ymdPago || !ymdDesde) {
           return false;
         }
+        if (ymdPago < ymdDesde) return false;
       }
       if (filtros.fechaHasta) {
         if (!cuota.fechaPago) return false;
-        if (new Date(cuota.fechaPago) > new Date(filtros.fechaHasta)) {
+        const ymdPago = extractYMD(cuota.fechaPago);
+        const ymdHasta = extractYMD(filtros.fechaHasta);
+        if (!ymdPago || !ymdHasta) {
           return false;
         }
+        if (ymdPago > ymdHasta) return false;
       }
       if (filtros.socio) {
         const texto = `${cuota.numeroSocio} ${cuota.apellido} ${cuota.nombre}`.toLowerCase();
@@ -169,6 +203,9 @@ export const ListadoPagos = () => {
     [cuotasFiltradas],
   );
 
+  /** Todos los cobros (para reimprimir recibo con todas las cuotas del mismo número) */
+  const todosPagos = useMemo(() => cuotas.filter((c) => c.pagado), [cuotas]);
+
   const [ordenColumna, setOrdenColumna] = useState<{ columna: string; direccion: 'asc' | 'desc' } | null>(null);
 
   const handleOrdenar = (columna: string) => {
@@ -185,6 +222,9 @@ export const ListadoPagos = () => {
     return [...pagosFiltrados].sort((a, b) => {
       let comparacion = 0;
       switch (columna) {
+        case 'numeroRecibo':
+          comparacion = (a.numeroRecibo ?? 0) - (b.numeroRecibo ?? 0);
+          break;
         case 'fechaPago':
           comparacion = (a.fechaPago || '').localeCompare(b.fechaPago || '');
           break;
@@ -268,6 +308,90 @@ export const ListadoPagos = () => {
     },
   };
 
+  const graficoBarrasData = useMemo(() => {
+    const porMes = new Map<string, number>();
+    pagosFiltrados.forEach((p) => {
+      if (!p.mes) return;
+      const actual = porMes.get(p.mes) ?? 0;
+      porMes.set(p.mes, actual + p.monto);
+    });
+    const meses = [...porMes.keys()].sort();
+    if (meses.length === 0) return null;
+    const labels = meses.map((mes) => {
+      const [año, m] = mes.split('-');
+      const d = new Date(parseInt(año, 10), parseInt(m, 10) - 1, 1);
+      return d.toLocaleString('es-AR', { month: 'short', year: '2-digit' });
+    });
+    const data = meses.map((mes) => porMes.get(mes) ?? 0);
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Cobrado',
+          data,
+          backgroundColor: 'rgba(72, 187, 120, 0.8)',
+          borderColor: 'rgb(56, 161, 105)',
+          borderWidth: 1,
+        },
+      ],
+    };
+  }, [pagosFiltrados]);
+
+  const graficoBarrasOptions: ChartOptions<'bar'> = useMemo(
+    () => ({
+      responsive: true,
+      plugins: { legend: { position: 'top' as const } },
+      scales: {
+        x: { stacked: false },
+        y: {
+          beginAtZero: true,
+          ticks: { callback: (v) => (typeof v === 'number' ? `$${v.toLocaleString('es-AR')}` : v) },
+        },
+      },
+    }),
+    [],
+  );
+
+  const reimprimirRecibo = async (pago: CuotaExtendida) => {
+    if (pago.numeroRecibo == null) {
+      alert('Este cobro no tiene número de recibo.');
+      return;
+    }
+    const cuotasDelRecibo = todosPagos.filter((p) => p.numeroRecibo === pago.numeroRecibo);
+    if (cuotasDelRecibo.length === 0) return;
+    const primero = cuotasDelRecibo[0];
+    const socio = {
+      numeroSocio: primero.numeroSocio,
+      apellido: primero.apellido,
+      nombre: primero.nombre,
+    };
+    const total = cuotasDelRecibo.reduce((s, c) => s + c.monto, 0);
+    const porMedio = new Map<string, number>();
+    cuotasDelRecibo.forEach((c) => {
+      const medio = c.medioPago || 'Efectivo';
+      porMedio.set(medio, (porMedio.get(medio) ?? 0) + c.monto);
+    });
+    const medios = [...porMedio.entries()]
+      .map(([medio, monto]) => `${medio}: $${monto.toFixed(2)}`)
+      .join(' | ');
+    const cuotas = cuotasDelRecibo.map((c) => ({
+      mes: c.mes,
+      fechaLiquidacion: c.fechaLiquidacion,
+      monto: c.monto,
+    }));
+    const { generarRecibo } = await import('../utils/reciboPdf');
+    const result = generarRecibo({
+      socio,
+      medios,
+      cuotas,
+      total,
+      nombreClub,
+      numeroRecibo: pago.numeroRecibo,
+      fechaEmision: primero.fechaPago ?? pago.fechaPago ?? null,
+    });
+    window.open(result.url, '_blank');
+  };
+
   return (
     <div className="listado-pagos">
       <div className="card">
@@ -310,121 +434,177 @@ export const ListadoPagos = () => {
           </div>
         </div>
 
-        {mostrarGrafico && graficoData && (
-          <div className="grafico-pagos">
-            <Pie data={graficoData} options={graficoOptions} />
+        {mostrarGrafico && (graficoData || graficoBarrasData) && (
+          <div className="graficos-pagos-wrapper">
+            <div
+              className="grafico-pagos grafico-clickeable"
+              role="button"
+              tabIndex={0}
+              onClick={() => graficoData && setModalGrafico('pie')}
+              onKeyDown={(e) => graficoData && (e.key === 'Enter' || e.key === ' ') && setModalGrafico('pie')}
+              title="Clic para ampliar"
+            >
+              {graficoData && (
+                <ErrorBoundary compact message="El gráfico no pudo mostrarse.">
+                  <Pie data={graficoData} options={graficoOptions} />
+                </ErrorBoundary>
+              )}
+            </div>
+            {graficoBarrasData && (
+              <div
+                className="grafico-barras-pagos grafico-clickeable"
+                role="button"
+                tabIndex={0}
+                onClick={() => setModalGrafico('barras')}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setModalGrafico('barras')}
+                title="Clic para ampliar"
+              >
+                <h3 className="grafico-barras-titulo">Cobrado por mes</h3>
+                <ErrorBoundary compact message="El gráfico no pudo mostrarse.">
+                  <Bar data={graficoBarrasData} options={graficoBarrasOptions} />
+                </ErrorBoundary>
+              </div>
+            )}
           </div>
         )}
 
-        <div className="filtros-pagos">
-          <div className="filtro">
-            <label htmlFor="fecha-desde">Fecha cobro desde</label>
-            <input
-              id="fecha-desde"
-              type="date"
-              value={filtros.fechaDesde}
-              onChange={(e) => setFiltros((prev) => ({ ...prev, fechaDesde: e.target.value }))}
-            />
+        {modalGrafico && (
+          <div
+            className="modal-grafico-overlay"
+            onClick={() => setModalGrafico(null)}
+            onKeyDown={(e) => e.key === 'Escape' && setModalGrafico(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Gráfico ampliado"
+          >
+            <div className="modal-grafico-contenido" onClick={(e) => e.stopPropagation()}>
+              <button type="button" className="modal-grafico-cerrar" onClick={() => setModalGrafico(null)} aria-label="Cerrar">
+                ✕
+              </button>
+              {modalGrafico === 'pie' && graficoData && (
+                <div className="modal-grafico-cuerpo">
+                  <ErrorBoundary compact message="El gráfico no pudo mostrarse.">
+                    <Pie data={graficoData} options={graficoOptions} />
+                  </ErrorBoundary>
+                </div>
+              )}
+              {modalGrafico === 'barras' && graficoBarrasData && (
+                <div className="modal-grafico-cuerpo modal-grafico-barras">
+                  <h3 className="grafico-barras-titulo">Cobrado por mes</h3>
+                  <ErrorBoundary compact message="El gráfico no pudo mostrarse.">
+                    <Bar data={graficoBarrasData} options={graficoBarrasOptions} />
+                  </ErrorBoundary>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="filtro">
-            <label htmlFor="fecha-hasta">Fecha cobro hasta</label>
-            <input
-              id="fecha-hasta"
-              type="date"
-              value={filtros.fechaHasta}
-              onChange={(e) => setFiltros((prev) => ({ ...prev, fechaHasta: e.target.value }))}
-            />
-          </div>
-          <div className="filtro">
-            <label htmlFor="socio">Socio</label>
-            <input
-              id="socio"
-              type="text"
-              placeholder="Número o nombre"
-              value={filtros.socio}
-              onChange={(e) => setFiltros((prev) => ({ ...prev, socio: e.target.value }))}
-            />
-          </div>
-          <div className="filtro">
-            <label htmlFor="mes">Mes liquidado</label>
-            <select
-              id="mes"
-              value={filtros.mes}
-              onChange={(e) => setFiltros((prev) => ({ ...prev, mes: e.target.value }))}
-            >
-              <option value="">Todos</option>
-              {mesesDisponibles.map((mes) => (
-                <option key={mes} value={mes}>
-                  {formatearMes(mes)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="filtro">
-            <label htmlFor="medio">Medio de pago</label>
-            <select
-              id="medio"
-              value={filtros.medioPago}
-              onChange={(e) => setFiltros((prev) => ({ ...prev, medioPago: e.target.value }))}
-            >
-              <option value="">Todos</option>
-              {mediosDisponibles.map((medio) => (
-                <option key={medio} value={medio}>
-                  {medio}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="filtro">
-            <label htmlFor="categoria">Categoría de socio</label>
-            <select
-              id="categoria"
-              value={filtros.categoriaId}
-              onChange={(e) => setFiltros((prev) => ({ ...prev, categoriaId: e.target.value }))}
-            >
-              <option value="">Todas</option>
-              {categorias.map((categoria) => (
-                <option key={categoria.id} value={categoria.id}>
-                  {categoria.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="acciones-filtros">
-            <button
-              className="btn-limpiar"
-              onClick={() =>
-                setFiltros({
-                  fechaDesde: '',
-                  fechaHasta: '',
-                  socio: '',
-                  mes: '',
-                  medioPago: '',
-                  categoriaId: '',
-                })
-              }
-            >
-              Limpiar filtros
-            </button>
-            <button className="btn-exportar" onClick={() => exportarPagosPdf(pagosFiltrados, nombreClub).catch(console.error)}>
-              📄 Exportar PDF
-            </button>
-            <button className="btn-exportar btn-exportar-excel" onClick={() => exportarPagosExcel(pagosFiltrados, visible).catch(console.error)}>
-              📊 Exportar Excel
-            </button>
-            <button
-              className="btn-grafico"
-              onClick={() => setMostrarGrafico((prev) => !prev)}
-              disabled={!graficoData}
-            >
-              📊 {mostrarGrafico ? 'Ocultar gráfico' : 'Ver gráfico'}
-            </button>
-          </div>
-        </div>
+        )}
 
         <div className="tabla-pagos-container">
-          <div className="tabla-wrapper">
-            <div className="tabla-acciones-superior">
+          <div className="tabla-acciones-superior">
+            <div className="tabla-fila-filtros">
+              {isFilterVisible('fechaDesde') && (
+                <div className="filtro">
+                  <label htmlFor="fecha-desde">Fecha cobro desde</label>
+                  <input
+                    id="fecha-desde"
+                    type="date"
+                    value={filtros.fechaDesde}
+                    onChange={(e) => setFiltros((prev) => ({ ...prev, fechaDesde: e.target.value }))}
+                  />
+                </div>
+              )}
+              {isFilterVisible('fechaHasta') && (
+                <div className="filtro">
+                  <label htmlFor="fecha-hasta">Fecha cobro hasta</label>
+                  <input
+                    id="fecha-hasta"
+                    type="date"
+                    value={filtros.fechaHasta}
+                    onChange={(e) => setFiltros((prev) => ({ ...prev, fechaHasta: e.target.value }))}
+                  />
+                </div>
+              )}
+              {isFilterVisible('socio') && (
+                <div className="filtro">
+                  <label htmlFor="socio">Socio</label>
+                  <input
+                    id="socio"
+                    type="text"
+                    placeholder="Número o nombre"
+                    value={filtros.socio}
+                    onChange={(e) => setFiltros((prev) => ({ ...prev, socio: e.target.value }))}
+                  />
+                </div>
+              )}
+              {isFilterVisible('mes') && (
+                <div className="filtro">
+                  <label htmlFor="mes">Mes liquidado</label>
+                  <select
+                    id="mes"
+                    value={filtros.mes}
+                    onChange={(e) => setFiltros((prev) => ({ ...prev, mes: e.target.value }))}
+                  >
+                    <option value="">Todos</option>
+                    {mesesDisponibles.map((mes) => (
+                      <option key={mes} value={mes}>
+                        {formatearMes(mes)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {isFilterVisible('medioPago') && (
+                <div className="filtro">
+                  <label htmlFor="medio">Medio de pago</label>
+                  <select
+                    id="medio"
+                    value={filtros.medioPago}
+                    onChange={(e) => setFiltros((prev) => ({ ...prev, medioPago: e.target.value }))}
+                  >
+                    <option value="">Todos</option>
+                    {mediosDisponibles.map((medio) => (
+                      <option key={medio} value={medio}>
+                        {medio}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {isFilterVisible('categoriaId') && (
+                <div className="filtro">
+                  <label htmlFor="categoria">Categoría de socio</label>
+                  <select
+                    id="categoria"
+                    value={filtros.categoriaId}
+                    onChange={(e) => setFiltros((prev) => ({ ...prev, categoriaId: e.target.value }))}
+                  >
+                    <option value="">Todas</option>
+                    {categorias.map((categoria) => (
+                      <option key={categoria.id} value={categoria.id}>
+                        {categoria.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <button
+                className="btn-limpiar"
+                onClick={() =>
+                  setFiltros({
+                    fechaDesde: '',
+                    fechaHasta: '',
+                    socio: '',
+                    mes: '',
+                    medioPago: '',
+                    categoriaId: '',
+                  })
+                }
+              >
+                Limpiar filtros
+              </button>
+            </div>
+            <div className="tabla-fila-acciones">
               <SelectorColumnas
                 columnas={PAGOS_COLUMNS}
                 visibleIds={visible}
@@ -432,10 +612,51 @@ export const ListadoPagos = () => {
                 onRestaurar={() => setVisibleColumns(PAGOS_DEFAULT_VISIBLE)}
                 titulo="Columnas visibles"
               />
+              <SelectorColumnas
+                columnas={PAGOS_FILTROS}
+                visibleIds={visibleFilters}
+                onToggle={toggleFilter}
+                onRestaurar={() => setVisibleFilters(PAGOS_FILTROS_DEFAULT)}
+                titulo="Filtros visibles"
+                labelBoton="Filtros"
+              />
+              <button
+                className="btn-exportar"
+                onClick={() => exportarPagosPdf(pagosFiltrados, nombreClub, visible).catch(console.error)}
+              >
+                📄 Exportar PDF
+              </button>
+              <button
+                className="btn-exportar btn-exportar-excel"
+                onClick={() => exportarPagosExcel(pagosFiltrados, visible).catch(console.error)}
+              >
+                📊 Exportar Excel
+              </button>
+              <button
+                className="btn-grafico"
+                onClick={() => setMostrarGrafico((prev) => !prev)}
+                disabled={!graficoData && !graficoBarrasData}
+              >
+                📊 {mostrarGrafico ? 'Ocultar gráfico' : 'Ver gráfico'}
+              </button>
             </div>
+          </div>
+          <div className="tabla-wrapper">
             <table className="tabla-pagos">
             <thead>
               <tr>
+                {isVisible('numeroRecibo') && (
+                  <th
+                    className="sortable"
+                    onClick={() => handleOrdenar('numeroRecibo')}
+                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    Nº Recibo
+                    {ordenColumna?.columna === 'numeroRecibo' && (
+                      <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                    )}
+                  </th>
+                )}
                 {isVisible('fechaPago') && (
                   <th
                     className="sortable"
@@ -508,6 +729,7 @@ export const ListadoPagos = () => {
                     )}
                   </th>
                 )}
+                {isVisible('acciones') && <th>Acciones</th>}
               </tr>
             </thead>
             <tbody>
@@ -520,7 +742,10 @@ export const ListadoPagos = () => {
               ) : (
                 pagosOrdenados.map((pago) => (
                   <tr key={pago.id}>
-                    {isVisible('fechaPago') && <td>{pago.fechaPago || '-'}</td>}
+                    {isVisible('numeroRecibo') && (
+                      <td>{pago.numeroRecibo != null ? String(pago.numeroRecibo).padStart(6, '0') : '-'}</td>
+                    )}
+                    {isVisible('fechaPago') && <td>{formatDateOnlyES(pago.fechaPago)}</td>}
                     {isVisible('socio') && (
                       <td>
                         {pago.numeroSocio} - {pago.apellido}, {pago.nombre}
@@ -529,7 +754,20 @@ export const ListadoPagos = () => {
                     {isVisible('mes') && <td>{formatearMes(pago.mes)}</td>}
                     {isVisible('monto') && <td>${pago.monto.toFixed(2)}</td>}
                     {isVisible('medioPago') && <td>{pago.medioPago ?? '-'}</td>}
-                    {isVisible('fechaLiquidacion') && <td>{pago.fechaLiquidacion || '-'}</td>}
+                    {isVisible('fechaLiquidacion') && <td>{formatDateOnlyES(pago.fechaLiquidacion)}</td>}
+                    {isVisible('acciones') && (
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-reimprimir-recibo"
+                          onClick={() => reimprimirRecibo(pago)}
+                          disabled={pago.numeroRecibo == null}
+                          title={pago.numeroRecibo != null ? 'Reimprimir recibo' : 'Sin número de recibo'}
+                        >
+                          🖨️ Reimprimir recibo
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -542,7 +780,17 @@ export const ListadoPagos = () => {
   );
 };
 
-const exportarPagosPdf = async (pagos: CuotaExtendida[], nombreClub: string) => {
+const PAGOS_PDF_COLUMNS: { id: string; header: string; getValue: (p: CuotaExtendida) => string | number }[] = [
+  { id: 'numeroRecibo', header: 'Nº Recibo', getValue: (p) => (p.numeroRecibo != null ? String(p.numeroRecibo).padStart(6, '0') : '-') },
+  { id: 'fechaPago', header: 'Fecha Pago', getValue: (p) => formatDateOnlyES(p.fechaPago) },
+  { id: 'socio', header: 'Socio', getValue: (p) => `${p.numeroSocio} - ${p.apellido}, ${p.nombre}` },
+  { id: 'mes', header: 'Mes', getValue: (p) => formatearMes(p.mes) },
+  { id: 'monto', header: 'Monto', getValue: (p) => `$${p.monto.toFixed(2)}` },
+  { id: 'medioPago', header: 'Medio de Pago', getValue: (p) => p.medioPago ?? '-' },
+  { id: 'fechaLiquidacion', header: 'Fecha Liquidación', getValue: (p) => formatDateOnlyES(p.fechaLiquidacion) },
+];
+
+const exportarPagosPdf = async (pagos: CuotaExtendida[], nombreClub: string, visibleColumnIds: string[] = []) => {
   if (pagos.length === 0) {
     alert('No hay cobros para exportar.');
     return;
@@ -556,6 +804,14 @@ const exportarPagosPdf = async (pagos: CuotaExtendida[], nombreClub: string) => 
     console.warn('No se pudo registrar la exportación en auditoría:', err);
   }
 
+  const ids = visibleColumnIds.length > 0 ? visibleColumnIds : PAGOS_COLUMNS.map((c) => c.id);
+  const columns = PAGOS_PDF_COLUMNS.filter((c) => ids.includes(c.id));
+  if (columns.length === 0) return;
+
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
   const doc = new jsPDF({ orientation: 'landscape' });
   const fecha = new Date().toLocaleString('es-AR');
 
@@ -582,24 +838,8 @@ const exportarPagosPdf = async (pagos: CuotaExtendida[], nombreClub: string) => 
       textColor: 45,
       fontSize: 9,
     },
-    head: [
-      [
-        'Fecha Pago',
-        'Socio',
-        'Mes',
-        'Monto',
-        'Medio de Pago',
-        'Fecha Liquidación',
-      ],
-    ],
-    body: pagos.map((pago) => [
-      pago.fechaPago || '-',
-      `${pago.numeroSocio} - ${pago.apellido}, ${pago.nombre}`,
-      formatearMes(pago.mes),
-      `$${pago.monto.toFixed(2)}`,
-      pago.medioPago ?? '-',
-      pago.fechaLiquidacion || '-',
-    ]),
+    head: [columns.map((c) => c.header)],
+    body: pagos.map((pago) => columns.map((c) => c.getValue(pago))),
     didDrawPage: (data) => {
       if (data.pageNumber > 1) {
         dibujarEncabezadoConLogo(doc, 'landscape', nombreClub);
@@ -631,14 +871,16 @@ const exportarPagosExcel = async (pagos: CuotaExtendida[], visibleColumnIds: str
     console.warn('No se pudo registrar la exportación en auditoría:', err);
   }
   const columnMap: Record<string, (p: CuotaExtendida) => string | number> = {
-    fechaPago: (p) => p.fechaPago || '-',
+    numeroRecibo: (p) => (p.numeroRecibo != null ? String(p.numeroRecibo).padStart(6, '0') : '-'),
+    fechaPago: (p) => formatDateOnlyES(p.fechaPago),
     socio: (p) => `${p.numeroSocio} - ${p.apellido}, ${p.nombre}`,
     mes: (p) => formatearMes(p.mes),
     monto: (p) => p.monto,
     medioPago: (p) => p.medioPago ?? '-',
-    fechaLiquidacion: (p) => p.fechaLiquidacion || '-',
+    fechaLiquidacion: (p) => formatDateOnlyES(p.fechaLiquidacion),
   };
   const headers: Record<string, string> = {
+    numeroRecibo: 'Nº Recibo',
     fechaPago: 'Fecha Pago',
     socio: 'Socio',
     mes: 'Mes',
@@ -655,6 +897,7 @@ const exportarPagosExcel = async (pagos: CuotaExtendida[], visibleColumnIds: str
     return row;
   });
   if (Object.keys(data[0] || {}).length === 0) return;
+  const { exportToExcel } = await import('../utils/exportExcel');
   exportToExcel(data, `Listado-Cobros-${Date.now()}`, 'Cobros');
 };
 

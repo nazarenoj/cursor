@@ -601,7 +601,7 @@ Puedes empezar a editar `src/App.tsx` para personalizar la aplicación. Los camb
 
 Regla general para todas las tablas se deben generar funciones para agregar , modificar, borra, listar  con distintos filtros tanto por pantalla como por impresora
 
-Necesito una aplicacion que me permita, siendo la organizacion un club social y deportivo, llevar una tabla  de socios con los siguintes datos:
+Necesito una aplicacion que me permita, siendo la organizacion un club social, llevar una tabla  de socios con los siguintes datos:
 
 -Numero de socio
 
@@ -2969,7 +2969,7 @@ export const Layout = ({ children }: LayoutProps) => {
     <div className="layout">
       <nav className="navbar">
         <div className="navbar-brand">
-          <h1>Club Social y Deportivo</h1>
+          <h1>Club Social Realico</h1>
         </div>
         <ul className="navbar-nav">
           <li>
@@ -3845,9 +3845,9 @@ Actualizando el README con las instrucciones de la nueva aplicación:
 
 
 ```markdown
-# Sistema de Gestión de Socios - Club Social y Deportivo
+# Sistema de Gestión de Socios - Club Social Realico
 
-Aplicación web completa para la gestión de socios de un club social y deportivo, desarrollada con React, TypeScript y Vite.
+Aplicación web completa para la gestión de socios de un club social, desarrollada con React, TypeScript y Vite.
 
 ## 🚀 Características
 

@@ -1,6 +1,6 @@
-# Sistema de Gestión de Socios - Club Social y Deportivo
+# Sistema de Gestión de Socios - Club Social Realico
 
-Aplicación web completa para la gestión de socios de un club social y deportivo, desarrollada con React, TypeScript y Vite.
+Aplicación web completa para la gestión de socios de un club social, desarrollada con React, TypeScript y Vite.
 
 ## 🚀 Características
 
@@ -81,19 +81,21 @@ La aplicación permite gestionar los siguientes datos de cada socio:
      COLLATE utf8mb4_spanish_ci;
    ```
 
-5. **Levantar el backend (Express + MySQL):**
-   ```bash
-   npm run server
-   ```
-   El API se expone en `http://localhost:4000/api`.
-
-6. **En otra terminal, iniciar el frontend:**
+5. **Iniciar el desarrollo (Frontend + Backend):**
    ```bash
    npm run dev
    ```
+   Este comando iniciará automáticamente tanto el frontend como el backend en una sola terminal.
+   
+   - **Frontend:** Se expone en `http://localhost:5173`
+   - **Backend:** API disponible en `http://localhost:4000/api`
 
-7. **Abrir el navegador:**
-   La aplicación estará disponible en `http://localhost:5173`. Asegurate de mantener el backend en ejecución para que la app pueda leer y guardar datos.
+6. **Abrir el navegador:**
+   La aplicación estará disponible en `http://localhost:5173`.
+
+**Nota:** Si necesitas ejecutar solo el frontend o solo el backend:
+- Solo frontend: `npm run dev:frontend`
+- Solo backend: `npm run server` o `npm run dev:backend`
 
 ## 📁 Estructura del Proyecto
 
@@ -140,8 +142,10 @@ La aplicación permite gestionar los siguientes datos de cada socio:
 
 ## 🛠️ Scripts Disponibles
 
-- `npm run dev` - Inicia el frontend (Vite)
-- `npm run server` - Inicia el backend Express (usa nodemon para recarga en caliente)
+- `npm run dev` - Inicia el frontend y backend simultáneamente (recomendado para desarrollo)
+- `npm run dev:frontend` - Inicia solo el frontend (Vite)
+- `npm run dev:backend` - Inicia solo el backend Express (usa nodemon para recarga en caliente)
+- `npm run server` - Alias para `npm run dev:backend`
 - `npm run build` - Construye la aplicación para producción
 - `npm run preview` - Previsualiza la versión de producción
 - `npm run lint` - Ejecuta el linter para verificar el código
@@ -244,7 +248,14 @@ Todas las tablas del sistema implementan las siguientes funciones:
 
 ¡Siéntete libre de modificar y extender esta aplicación según tus necesidades!
 
+## 📚 Documentación Adicional
+
+- [Guía de Despliegue en IIS](GUIA_DESPLIEGUE_IIS.md) - Instrucciones detalladas para desplegar en IIS
+- [Guía de Actualización de Producción](GUIA_ACTUALIZACION_PRODUCCION.md) - Cómo actualizar producción sin perder datos
+- [Verificación de Migraciones Seguras](VERIFICAR_MIGRACIONES_SEGURAS.md) - Confirmación de que las migraciones no borran datos
+- [Guía de Backup API](GUIA_BACKUP_API.md) - Sistema de backups automáticos
+
 ---
 
-**Desarrollado con ❤️ para la gestión eficiente de clubes sociales y deportivos**
+**Desarrollado con ❤️ para la gestión eficiente de clubes sociales**
 

@@ -1,12 +1,10 @@
 import { format } from 'date-fns';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { useClubConfig } from '../contexts/ClubConfigContext';
 import { dibujarEncabezadoConLogo } from '../utils/pdfLogo';
 import { apiService } from '../services/api';
-import { exportToExcel } from '../utils/exportExcel';
 import { useColumnPreferences } from '../hooks/useColumnPreferences';
 import type { LiquidacionCuota } from '../types';
+import { formatDateOnlyES } from '../utils/clubDateTime';
 import './ImprimirTesoreria.css';
 
 const TESORERIA_DETALLE_IDS = [
@@ -35,6 +33,11 @@ interface ImprimirTesoreriaProps {
     fechaDesde: string;
     fechaHasta: string;
     medioPago: string;
+    socioTexto?: string;
+    categoriaId?: string;
+    mesLiquidacion?: string;
+    socioNombre?: string;
+    categoriaNombre?: string;
   };
   onVolver: () => void;
 }
@@ -62,6 +65,10 @@ export const ImprimirTesoreria = ({
       console.error('Error al registrar exportación:', error);
     }
 
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable'),
+    ]);
     const doc = new jsPDF({ orientation: 'portrait' });
     const fecha = new Date().toLocaleString('es-AR');
 
@@ -125,6 +132,13 @@ export const ImprimirTesoreria = ({
         })}`, 14, yPos);
         yPos += 8;
 
+        const ids = visibleColumns.length > 0 ? visibleColumns : TESORERIA_DETALLE_IDS;
+        const pdfIds = ids.filter((id) => id !== 'medioPago');
+        const headersRow = pdfIds.map((id) => TESORERIA_HEADERS[id] || id);
+        if (headersRow.length === 0) {
+          yPos += 10;
+          return;
+        }
         autoTable(doc, {
           startY: yPos,
           headStyles: {
@@ -136,21 +150,21 @@ export const ImprimirTesoreria = ({
             textColor: 45,
             fontSize: 8,
           },
-          head: [['Fecha Cobro', 'N° Socio', 'Apellido', 'Nombre', 'Categoría', 'Mes Liquidación', 'Monto']],
+          head: [headersRow],
           body: pagosMedio
             .sort((a, b) => (b.fechaPago || '').localeCompare(a.fechaPago || ''))
-            .map((pago) => [
-              formatFecha(pago.fechaPago),
-              pago.numeroSocio.toString(),
-              pago.apellido,
-              pago.nombre,
-              pago.categoriaNombre,
-              getNombreMes(pago.mes),
-              `$${pago.monto.toLocaleString('es-AR', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}`,
-            ]),
+            .map((pago) =>
+              pdfIds.map((id) => {
+                if (id === 'fechaPago') return formatFecha(pago.fechaPago);
+                if (id === 'numeroSocio') return pago.numeroSocio.toString();
+                if (id === 'apellido') return pago.apellido;
+                if (id === 'nombre') return pago.nombre;
+                if (id === 'categoria') return pago.categoriaNombre;
+                if (id === 'mesLiquidacion') return getNombreMes(pago.mes);
+                if (id === 'monto') return `$${pago.monto.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                return '';
+              }),
+            ),
           didDrawPage: (data) => {
             if (data.pageNumber > 1 && data.cursor && data.cursor.y < 50) {
               dibujarEncabezadoConLogo(doc, 'portrait', nombreClub);
@@ -168,19 +182,14 @@ export const ImprimirTesoreria = ({
           },
         });
 
-        yPos = (doc as any).lastAutoTable.finalY + 10;
+        yPos = (doc as typeof doc & { lastAutoTable?: { finalY: number } }).lastAutoTable!.finalY + 10;
       });
 
     doc.save(`Informe-Tesoreria-${Date.now()}.pdf`);
   };
 
   const formatFecha = (fecha: string | null) => {
-    if (!fecha) return '-';
-    try {
-      return format(new Date(fecha), 'dd/MM/yyyy');
-    } catch {
-      return fecha;
-    }
+    return formatDateOnlyES(fecha);
   };
 
   const getNombreMes = (mesString: string) => {
@@ -190,15 +199,29 @@ export const ImprimirTesoreria = ({
     return fecha.toLocaleString('es-AR', { month: 'long', year: 'numeric' });
   };
 
+  const TESORERIA_HEADERS: Record<string, string> = {
+    medioPago: 'Medio de Pago',
+    fechaPago: 'Fecha Cobro',
+    numeroSocio: 'N° Socio',
+    apellido: 'Apellido',
+    nombre: 'Nombre',
+    categoria: 'Categoría',
+    mesLiquidacion: 'Mes Liquidación',
+    monto: 'Monto',
+  };
+
   const getFiltrosTexto = () => {
     const filtrosTexto: string[] = [];
     if (filtros.fechaDesde) filtrosTexto.push(`Desde: ${formatFecha(filtros.fechaDesde)}`);
     if (filtros.fechaHasta) filtrosTexto.push(`Hasta: ${formatFecha(filtros.fechaHasta)}`);
     if (filtros.medioPago) filtrosTexto.push(`Medio: ${filtros.medioPago}`);
+    if (filtros.socioNombre) filtrosTexto.push(`Socio: ${filtros.socioNombre}`);
+    if (filtros.categoriaNombre) filtrosTexto.push(`Categoría: ${filtros.categoriaNombre}`);
+    if (filtros.mesLiquidacion) filtrosTexto.push(`Mes: ${filtros.mesLiquidacion}`);
     return filtrosTexto.length > 0 ? filtrosTexto.join(' | ') : 'Sin filtros';
   };
 
-  const handleExportarExcel = () => {
+  const handleExportarExcel = async () => {
     const totalRegistros = Object.values(pagosPorMedio).reduce((sum, pagos) => sum + pagos.length, 0);
     if (totalRegistros === 0) return;
     try {
@@ -244,6 +267,7 @@ export const ImprimirTesoreria = ({
           });
       });
     if (data.length > 0 && Object.keys(data[0]).length > 0) {
+      const { exportToExcel } = await import('../utils/exportExcel');
       exportToExcel(data, `Informe-Tesoreria-${Date.now()}`, 'Tesoreria');
     }
   };

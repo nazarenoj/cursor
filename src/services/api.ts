@@ -6,6 +6,9 @@ import type {
   LiquidacionMensual,
   Localidad,
   WhatsAppTemplate,
+  WhatsAppBaileysStatus,
+  WhatsAppBaileysBatchItem,
+  WhatsAppBaileysBatchResult,
   Socio,
   Usuario,
   LoginResponse,
@@ -16,34 +19,47 @@ import type {
   Auditoria,
 } from '../types';
 
-// Localhost: puerto 4000 en desarrollo. Producción: mismo origen + /api (Hostinger usa 3000)
+// Localhost: puerto 4000 en desarrollo.
+// Producción: mismo origen + /api (para deploy multi-instancia sin recompilar por puerto/dominio).
 const getApiUrl = () => {
   const hostname = window.location.hostname;
   const protocol = window.location.protocol;
   const port = window.location.port;
+
+  const portPart = port && port !== '80' && port !== '443' ? `:${port}` : '';
+
+  // build único: en producción siempre apuntar al mismo origen donde corre el frontend.
+  if (import.meta.env.PROD) {
+    return `${protocol}//${hostname}${portPart}/api`;
+  }
+
+  // Desarrollo local
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return 'http://localhost:4000/api';
   }
+
+  // Desarrollo contra otro host: permite override opcional
   if (import.meta.env.VITE_API_URL) {
     const url = (import.meta.env.VITE_API_URL as string).trim();
     return url.replace(/\/+$/, '') + (url.endsWith('/api') ? '' : '/api');
   }
-  const portPart = port && port !== '80' && port !== '443' ? `:${port}` : '';
+
   return `${protocol}//${hostname}${portPart}/api`;
 };
 
 const API_BASE_URL = getApiUrl();
 
-const getToken = () => {
-  return localStorage.getItem('auth_token');
-};
+/** Token en memoria (no localStorage) para reducir riesgo de robo por XSS. Tras recargar la página se pierde y el usuario debe volver a iniciar sesión. */
+let inMemoryToken: string | null = null;
+
+const getToken = () => inMemoryToken;
 
 const setToken = (token: string) => {
-  localStorage.setItem('auth_token', token);
+  inMemoryToken = token;
 };
 
 const removeToken = () => {
-  localStorage.removeItem('auth_token');
+  inMemoryToken = null;
 };
 
 interface RequestOptions extends RequestInit {
@@ -95,16 +111,19 @@ const request = async <T = unknown>(path: string, options: RequestOptions = {}) 
     fetchOptions.signal = options.signal;
   }
 
+  const fullUrl = `${API_BASE_URL}${path}`;
+
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, fetchOptions);
-  } catch (fetchError: any) {
+    response = await fetch(fullUrl, fetchOptions);
+  } catch (fetchError: unknown) {
+    const err = fetchError as { name?: string; message?: string };
     // Si es un error de abort, lanzar un error más descriptivo
-    if (fetchError.name === 'AbortError' || fetchError.message?.includes('aborted')) {
+    if (err?.name === 'AbortError' || err?.message?.includes('aborted')) {
       throw new Error('La operación fue cancelada por timeout. Por favor, inténtalo de nuevo.');
     }
     // Si es un error de red, lanzar un error más descriptivo
-    if (fetchError.message?.includes('Failed to fetch') || fetchError.message?.includes('NetworkError')) {
+    if (err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError')) {
       throw new Error(
         'Error de conexión con el servidor. Verifica que el backend esté ejecutándose (en la raíz del proyecto: npm run dev, o en otra terminal: cd server && npm run dev).'
       );
@@ -136,17 +155,41 @@ const request = async <T = unknown>(path: string, options: RequestOptions = {}) 
   }
 };
 
-const buildSociosQuery = (filtros?: FiltrosSocio): string => {
-  if (!filtros) return '';
+export interface SociosResponse {
+  data: Socio[];
+  meta: { total: number; pages: number; currentPage: number };
+}
+
+export type SociosSort = { sortBy: string; sortDir: 'asc' | 'desc' };
+
+const buildSociosQuery = (
+  filtros?: FiltrosSocio,
+  page?: number,
+  limit?: number,
+  sort?: SociosSort,
+): string => {
   const params = new URLSearchParams();
-  Object.entries(filtros).forEach(([key, value]) => {
-    if (value === undefined || value === null || value === '') return;
-    if (typeof value === 'boolean') {
-      params.append(key, value ? 'true' : 'false');
-    } else {
-      params.append(key, String(value));
-    }
-  });
+  if (filtros) {
+    Object.entries(filtros).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') return;
+      if (key === 'categoriaIds' && Array.isArray(value)) {
+        if (value.length === 0) return;
+        params.set('categoriaIds', value.join(','));
+        return;
+      }
+      if (typeof value === 'boolean') {
+        params.append(key, value ? 'true' : 'false');
+      } else {
+        params.append(key, String(value));
+      }
+    });
+  }
+  if (page != null && page >= 1) params.set('page', String(page));
+  if (limit != null && limit >= 1) params.set('limit', String(limit));
+  if (sort?.sortBy) {
+    params.set('sortBy', sort.sortBy);
+    params.set('sortDir', sort.sortDir);
+  }
   const query = params.toString();
   return query ? `?${query}` : '';
 };
@@ -185,23 +228,57 @@ export const apiService = {
   eliminarWhatsAppTemplate: (id: number) =>
     request<void>(`/whatsapp-templates/${id}`, { method: 'DELETE', parseJson: false }),
 
+  getWhatsAppBaileysStatus: () => request<WhatsAppBaileysStatus>('/whatsapp-baileys/status'),
+  sendWhatsAppBaileysBatch: (items: WhatsAppBaileysBatchItem[]) =>
+    request<WhatsAppBaileysBatchResult>('/whatsapp-baileys/send-batch', {
+      method: 'POST',
+      body: JSON.stringify({ items }),
+    }),
+
   // Configuración del club (nombre, logo, color)
   getClubConfig: () => request<ClubConfig>('/club-config'),
   getClubConfigPublic: () =>
-    request<Pick<ClubConfig, 'nombreClub' | 'logoUrl' | 'colorPrimario'>>('/club-config/public', {
-      requireAuth: false,
-    }),
-  updateClubConfig: (payload: { nombreClub?: string; colorPrimario?: string; logo?: File | null }) => {
+    request<Pick<ClubConfig, 'nombreClub' | 'logoUrl' | 'colorPrimario' | 'timezone' | 'appVersion'>>(
+      '/club-config/public',
+      {
+        requireAuth: false,
+      },
+    ),
+  updateClubConfig: (payload: {
+    nombreClub?: string;
+    colorPrimario?: string;
+    timezone?: string;
+    whatsappUsarServicio?: boolean;
+    logo?: File | null;
+  }) => {
     const formData = new FormData();
     if (payload.nombreClub != null) formData.append('nombreClub', payload.nombreClub);
     if (payload.colorPrimario != null) formData.append('colorPrimario', payload.colorPrimario);
+    if (payload.timezone != null) formData.append('timezone', payload.timezone);
+    if (payload.whatsappUsarServicio !== undefined) {
+      formData.append('whatsappUsarServicio', payload.whatsappUsarServicio ? '1' : '0');
+    }
     if (payload.logo !== undefined && payload.logo !== null) formData.append('logo', payload.logo);
     return request<ClubConfig>('/club-config', { method: 'PUT', body: formData });
   },
 
-  // Socios
-  getSocios: (filtros?: FiltrosSocio) =>
-    request<Socio[]>(`/socios${buildSociosQuery(filtros)}`),
+  // Socios (paginado; orden: sortBy= num_socio, apellido, nombre, dni, telefono, email, localidad, provincia, categoria; sortDir= asc|desc)
+  getSocios: (filtros?: FiltrosSocio, page?: number, limit?: number, sort?: SociosSort) =>
+    request<SociosResponse>(`/socios${buildSociosQuery(filtros, page ?? 1, limit ?? 20, sort)}`),
+  getSociosTodasLasPaginas: async (filtros?: FiltrosSocio, sort?: SociosSort): Promise<Socio[]> => {
+    const pageSize = 100;
+    const first = await request<SociosResponse>(
+      `/socios${buildSociosQuery(filtros, 1, pageSize, sort)}`,
+    );
+    const all: Socio[] = [...first.data];
+    for (let p = 2; p <= first.meta.pages; p++) {
+      const r = await request<SociosResponse>(`/socios${buildSociosQuery(filtros, p, pageSize, sort)}`);
+      all.push(...r.data);
+    }
+    return all;
+  },
+  getProximoNumeroSocio: () => request<{ siguiente: number }>('/socios/proximo-numero'),
+  getSocio: (id: number) => request<Socio>(`/socios/${id}`),
   crearSocio: (payload: Omit<Socio, 'id'>, foto?: File) => {
     const formData = new FormData();
     if (foto) {
@@ -299,7 +376,7 @@ export const apiService = {
 
   getLiquidacionesCuotas: () => request<LiquidacionCuota[]>('/liquidaciones-cuotas'),
   pagarCuotas: (ids: number[], medioPago: string, fechaPago?: string) =>
-    request<LiquidacionCuota[] | (LiquidacionCuota[] & { total?: number; cantidad?: number; medioPago?: string })>('/liquidaciones-cuotas/pagar', {
+    request<{ cuotas: LiquidacionCuota[]; numeroRecibo: number; total?: number; cantidad?: number; medioPago?: string }>('/liquidaciones-cuotas/pagar', {
       method: 'POST',
       body: JSON.stringify({ ids, medioPago, fechaPago }),
     }),
@@ -404,6 +481,7 @@ export const apiService = {
       config: {
         rutaBackup: string;
         frecuencia: string;
+        formatoBackup?: 'auto' | 'zip_portable';
         rutaWinRAR: string;
         mantenerBackups: {
           horarios: number;
@@ -412,14 +490,34 @@ export const apiService = {
           mensuales: number;
         };
       };
+      servidorWindows?: boolean;
       herramientas: {
         winrar: { disponible: boolean; ruta: string | null };
         mysqldump: { disponible: boolean; comando: string | null };
+        compresion?: {
+          disponible: boolean;
+          metodo: string | null;
+          extension: string | null;
+          mensaje: string | null;
+        };
       };
     }>('/backup/config'),
+  listarDirectoriosBackup: () =>
+    request<{
+      directorios: string[];
+    }>('/backup/directorios'),
+  getBackupExplorer: (currentPath?: string) =>
+    request<{
+      roots: string[];
+      actual: string;
+      padre: string;
+      puedeSubir: boolean;
+      subdirectorios: string[];
+    }>(`/backup/explorador${currentPath ? `?path=${encodeURIComponent(currentPath)}` : ''}`),
   updateBackupConfig: (config: {
     rutaBackup?: string;
     frecuencia?: string;
+    formatoBackup?: 'auto' | 'zip_portable';
     rutaWinRAR?: string;
     mantenerBackups?: {
       horarios?: number;
@@ -428,7 +526,7 @@ export const apiService = {
       mensuales?: number;
     };
   }) =>
-    request<{ message: string; config: any }>('/backup/config', {
+    request<{ message: string; config: Record<string, unknown> }>('/backup/config', {
       method: 'PUT',
       body: JSON.stringify(config),
     }),
@@ -436,12 +534,13 @@ export const apiService = {
     request<{
       message: string;
       resultado: {
-        fecha: string;
-        nombre: string;
-        ruta: string;
+        fecha?: string;
+        nombre?: string;
+        ruta?: string;
         exito: boolean;
-        pasos: string[];
-        errores: string[];
+        enProceso?: boolean;
+        pasos?: string[];
+        errores?: string[];
       };
     }>('/backup/ejecutar', { method: 'POST' }),
   listarBackups: () =>
@@ -467,6 +566,42 @@ export const apiService = {
     request<{ message: string; resultado: { exito: boolean; nombre: string } }>(`/backup/${encodeURIComponent(nombre)}`, {
       method: 'DELETE',
     }),
+
+  descargarBackup: async (nombre: string) => {
+    const token = getToken();
+    const requestHeaders: Record<string, string> = {};
+    if (token) {
+      requestHeaders['Authorization'] = `Bearer ${token}`;
+    }
+    const fullUrl = `${API_BASE_URL}/backup/descargar/${encodeURIComponent(nombre)}`;
+    const response = await fetch(fullUrl, { method: 'GET', headers: requestHeaders });
+    if (!response.ok) {
+      let msg = `Error ${response.status}`;
+      try {
+        const j = (await response.json()) as { message?: string };
+        if (j.message) msg = j.message;
+      } catch {
+        // ignore
+      }
+      throw new Error(msg);
+    }
+    const blob = await response.blob();
+    const cd = response.headers.get('Content-Disposition');
+    let filename = nombre;
+    const m = cd && /filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i.exec(cd);
+    if (m) {
+      filename = decodeURIComponent(m[1].trim());
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 
   // Auditoría
   getAuditoria: (filtros?: {
@@ -506,6 +641,22 @@ export const apiService = {
       erroresRecientes: number;
     }>('/auditoria/estadisticas'),
   getAuditoriaDetalle: (id: number) => request<Auditoria>(`/auditoria/${id}`),
+  getAuditoriaExportar: (filtros: {
+    usuario_id?: number;
+    modulo?: string;
+    accion?: string;
+    fecha_desde?: string;
+    fecha_hasta?: string;
+    resultado?: 'exitoso' | 'error';
+  }) => {
+    const params = new URLSearchParams();
+    Object.entries(filtros).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, String(value));
+      }
+    });
+    return request<{ registros: Auditoria[] }>(`/auditoria/exportar?${params.toString()}`);
+  },
   eliminarAuditoria: (filtros: {
     usuario_id?: number;
     modulo?: string;
@@ -535,7 +686,7 @@ export const apiService = {
     }),
 
   // Registrar exportación
-  registrarExportacion: (modulo: string, tipo: string, filtros?: any) => {
+  registrarExportacion: (modulo: string, tipo: string, filtros?: Record<string, unknown>) => {
     // Mapear nombres de módulos a rutas de API
     const rutasModulos: Record<string, string> = {
       'socios': 'socios/exportar',

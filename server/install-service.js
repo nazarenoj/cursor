@@ -3,7 +3,7 @@ const path = require('path');
 
 const svc = new Service({
   name: 'Club Social API',
-  description: 'API del Club Social y Deportivo Realicó',
+  description: 'API del Club Social Realico',
   script: path.join(__dirname, 'src', 'index.js'),
   nodeOptions: [
     '--max-old-space-size=1024'

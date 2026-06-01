@@ -43,12 +43,23 @@ const mapLiquidacionCuota = (row) => {
   return data;
 };
 
+const mapAdherente = (row) => {
+  const data = toCamel(row);
+  if (data) {
+    if (data.socioId !== undefined && data.socioId !== null) {
+      data.socioId = Number(data.socioId);
+    }
+  }
+  return data;
+};
+
 module.exports = {
   toCamel,
   mapCategoria,
   mapSocio,
   mapLiquidacionMensual,
   mapLiquidacionCuota,
+  mapAdherente,
 };
 
 

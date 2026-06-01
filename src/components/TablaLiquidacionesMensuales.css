@@ -7,10 +7,25 @@
 
 .tabla-acciones-superior {
   display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+.tabla-fila-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.tabla-fila-acciones {
+  display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem;
 }
 
 .tabla-wrapper {

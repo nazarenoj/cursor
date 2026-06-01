@@ -1,0 +1,90 @@
+---
+description: Estructura estándar de tablas que listan ítems (scroll, selector, orden, filtros)
+globs: 
+alwaysApply: true
+---
+
+# Tablas que listan ítems
+
+En todas las tablas que **listan ítems** (socios, cobros, liquidaciones, detalle por medio de pago, etc.) se debe usar **siempre** la misma estructura, salvo que se indique lo contrario.
+
+## Funcionalidades obligatorias
+
+1. **Selector de columnas**: Usar `SelectorColumnas` para permitir mostrar/ocultar columnas. Integrar con `useColumnPreferences`.
+2. **Ordenamiento por clic**: Encabezados de columna con clase `sortable`, `onClick` que llama a `handleOrdenar`, e indicador `↑`/`↓` según dirección.
+3. **Filtros por columnas**: Barra de filtros con inputs/selects para filtrar por las columnas relevantes (fecha, texto, categoría, etc.), con botón "Limpiar filtros".
+
+## Altura: no superar el viewport
+
+Los contenedores de páginas y listas no deben hacer que la página supere la altura visible (viewport). El layout principal usa `height: 100vh` y `overflow: hidden`; el scroll ocurre dentro de `main-content`. Evitar `min-height` que fuerce el contenido más allá del viewport sin scroll interno.
+
+## Ancho flexible del contenedor
+
+El contenedor de la tabla debe adaptarse a la resolución de la pantalla:
+- `width: 100%` y `max-width: min(95vw, 1600px)` (o similar según contexto)
+- `box-sizing: border-box` para incluir padding en el ancho
+- Evitar `max-width` fijos pequeños (ej. 1200px) que limiten en pantallas grandes
+
+## Estructura obligatoria (contenedor y scroll)
+
+1. **Contenedor exterior** (ej. `tabla-*-container`):
+   - `overflow: hidden`
+   - Ancho flexible según resolución (ver sección anterior)
+   - Opcional: `background`, `border-radius`, `box-shadow`, `border` para el bloque
+   - Envuelve todo el bloque de la tabla
+
+2. **Barra de acciones** (ej. `tabla-acciones-superior`), **fuera** del wrapper con scroll:
+   - Contiene SelectorColumnas, botones Exportar PDF/Excel, etc.
+   - Debe estar **fuera** del `tabla-wrapper` para que no se oculte al hacer scroll
+   - Es hermano del wrapper, no hijo
+
+3. **Wrapper con scroll** (ej. `tabla-wrapper`), hijo directo del contenedor:
+   - `overflow: auto`
+   - `max-height: min(75vh, 700px)` (o similar según contexto)
+   - `position: relative`
+   - `-webkit-overflow-scrolling: touch` si hay soporte táctil
+
+4. **Tabla** (`<table>`), dentro del wrapper:
+   - `thead` con `position: sticky; top: 0; z-index: 5` para que la cabecera quede fija al hacer scroll
+
+## Ejemplo de HTML/JSX
+
+```jsx
+<div className="tabla-pagos-container">
+  <div className="tabla-acciones-superior">
+    <SelectorColumnas ... />
+    <button>Exportar PDF</button>
+  </div>
+  <div className="tabla-wrapper">
+    <table className="tabla-pagos">
+      <thead>...</thead>
+      <tbody>...</tbody>
+    </table>
+  </div>
+</div>
+```
+
+## Ejemplo de CSS
+
+```css
+.tabla-pagos-container {
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.tabla-pagos-container .tabla-wrapper {
+  overflow: auto;
+  max-height: min(75vh, 700px);
+  position: relative;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tabla-pagos thead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+```
+
+Referencia de implementación en este proyecto: `TablaSocios`, `ListadoPagos`, `Tesoreria`, `ListaAuditoria`, `ListaCajas`, `TesoreriaMovimientos`, `TablaLiquidaciones`, `ListaCategorias`, `ListaUsuarios`, `ListaMediosPago`, `LiquidacionesSocio`.

@@ -3,6 +3,7 @@ import { apiService } from '../services/api';
 import type { MovimientoCaja, Caja } from '../types';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { formatDateOnlyES } from '../utils/clubDateTime';
 import './ResumenCaja.css';
 
 interface ResumenCajaProps {
@@ -92,15 +93,7 @@ export const ResumenCaja = ({ caja, onClose }: ResumenCajaProps) => {
   }, [movimientos]);
 
   const formatearFecha = (fecha: string) => {
-    try {
-      return new Date(fecha).toLocaleDateString('es-AR', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      });
-    } catch {
-      return fecha;
-    }
+    return formatDateOnlyES(fecha);
   };
 
   const generarPDF = async () => {
@@ -176,7 +169,7 @@ export const ResumenCaja = ({ caja, onClose }: ResumenCajaProps) => {
       ];
     });
     
-    (doc as any).autoTable({
+    (doc as jsPDF & { autoTable: (opts: Record<string, unknown>) => void }).autoTable({
       startY: yPos,
       head: [['Fecha', 'Tipo', 'Concepto', 'Descripción', 'Medio de Pago', 'Monto']],
       body: tableData,
@@ -195,7 +188,7 @@ export const ResumenCaja = ({ caja, onClose }: ResumenCajaProps) => {
     
     // Fecha de generación
     const fechaGeneracion = new Date().toLocaleString('es-AR');
-    const pageCount = (doc as any).internal.getNumberOfPages();
+    const pageCount = doc.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFontSize(8);

@@ -43,7 +43,23 @@
   box-sizing: border-box;
 }
 
+.configuracion-club-form select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 1rem;
+  box-sizing: border-box;
+  background: #fff;
+}
+
 .configuracion-club-form input[type="text"]:focus {
+  outline: none;
+  border-color: var(--color-primary, #667eea);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.configuracion-club-form select:focus {
   outline: none;
   border-color: var(--color-primary, #667eea);
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
@@ -164,4 +180,40 @@
 .mensaje-error {
   background: #fed7d7;
   color: #742a2a;
+}
+
+.form-label-block {
+  display: block;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.5rem;
+}
+
+.whatsapp-config-opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.whatsapp-config-radio {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-weight: normal;
+  cursor: pointer;
+  font-size: 0.92rem;
+  color: #4a5568;
+  line-height: 1.45;
+}
+
+.whatsapp-config-radio input {
+  margin-top: 0.25rem;
+  flex-shrink: 0;
+}
+
+.whatsapp-config-radio code {
+  font-size: 0.85em;
+  background: #edf2f7;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
 }

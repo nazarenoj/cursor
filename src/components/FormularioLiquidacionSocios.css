@@ -46,6 +46,215 @@
   margin-top: 10px;
 }
 
+.agregar-mes-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.agregar-mes-row label {
+  font-weight: 500;
+  color: #374151;
+}
+
+.select-mes-agregar {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  min-width: 180px;
+}
+
+.input-mes-agregar {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  min-width: 160px;
+}
+
+.input-mes-agregar:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.agregar-mes-row .agregar-mes-ayuda {
+  width: 100%;
+  margin: 4px 0 0 0;
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.btn-agregar-mes {
+  padding: 8px 16px;
+  border: 1px solid #059669;
+  border-radius: 6px;
+  background: #059669;
+  color: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.btn-agregar-mes:hover:not(:disabled) {
+  background: #047857;
+}
+
+.btn-agregar-mes:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cuotas-a-generar-list {
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 10px;
+  background: #f9fafb;
+  margin-bottom: 8px;
+}
+
+.cuotas-a-generar-wrapper {
+  margin-bottom: 8px;
+}
+
+.tabla-cuotas-leyenda {
+  margin-bottom: 10px;
+}
+
+.tabla-cuotas-scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 360px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f9fafb;
+}
+
+.tabla-cuotas-a-generar {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.tabla-cuotas-a-generar th,
+.tabla-cuotas-a-generar td {
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.tabla-cuotas-a-generar thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #eff6ff;
+}
+
+.tabla-cuotas-a-generar .th-socio {
+  text-align: left;
+  min-width: 180px;
+  font-weight: 600;
+  color: #1e40af;
+}
+
+.tabla-cuotas-a-generar .th-mes {
+  min-width: 72px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.tabla-cuotas-a-generar .td-socio {
+  text-align: left;
+  background: #f8fafc;
+  font-weight: 500;
+  color: #334155;
+}
+
+.tabla-cuotas-a-generar .td-mes {
+  min-width: 72px;
+}
+
+.btn-mes-incluido {
+  display: inline-block;
+  padding: 6px 10px;
+  border: 2px solid #3b82f6;
+  border-radius: 6px;
+  background: #dbeafe;
+  color: #1e40af;
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.btn-mes-incluido:hover {
+  background: #93c5fd;
+  border-color: #2563eb;
+  color: #1e3a8a;
+}
+
+.mes-vacio {
+  color: #cbd5e1;
+  font-size: 0.9rem;
+}
+
+.cuota-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  flex-wrap: wrap;
+}
+
+.cuota-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cuota-mes {
+  font-weight: 600;
+  color: #1e40af;
+  min-width: 140px;
+}
+
+.cuota-socio {
+  flex: 1;
+  color: #374151;
+  font-size: 0.9rem;
+}
+
+.btn-quitar-mes {
+  padding: 4px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  background: white;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.btn-quitar-mes:hover {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.resumen-cuotas {
+  margin-top: 4px;
+}
+
 .filtros-socios {
   display: flex;
   gap: 15px;
@@ -279,6 +488,43 @@
 }
 
 .lista-socios::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.cuotas-a-generar-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.cuotas-a-generar-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.cuotas-a-generar-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.cuotas-a-generar-list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.tabla-cuotas-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.tabla-cuotas-scroll::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.tabla-cuotas-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.tabla-cuotas-scroll::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
 

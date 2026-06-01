@@ -1,6 +1,7 @@
 .registrar-pagos {
   padding: 1.5rem;
-  max-width: 1400px;
+  width: 100%;
+  max-width: min(95vw, 1600px);
   margin: 0 auto;
   height: calc(100vh - 120px);
   display: flex;
@@ -81,12 +82,14 @@
 .columna-izquierda {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 0;
 }
 
 .columna-derecha {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 0;
 }
 
@@ -114,6 +117,8 @@
 .seccion-medios {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   gap: 0.75rem;
 }
 
@@ -159,14 +164,16 @@
 .medio-pago {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   gap: 0.5rem;
 }
 
 .medio-pago .opciones {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.4rem;
-  max-height: 140px;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
   padding: 0.5rem;
   border: 1px solid #e2e8f0;
@@ -197,12 +204,12 @@
 }
 
 .montos-medios {
-  margin-top: 0.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  max-height: 200px;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
+  gap: 0.5rem;
   padding: 0.5rem;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
@@ -238,7 +245,6 @@
   border: 1px solid #e2e8f0;
   flex: 1;
   min-height: 180px;
-  max-height: min(50vh, 480px);
   background: white;
   -webkit-overflow-scrolling: touch;
 }
@@ -333,12 +339,12 @@
 .resumen-pago {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
+  gap: 0.25rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
   background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
   color: #2d3748;
-  font-size: 0.9rem;
+  font-size: 0.7rem;
   border: 1px solid #cbd5e0;
   flex-shrink: 0;
 }

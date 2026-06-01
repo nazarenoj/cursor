@@ -39,16 +39,16 @@ export const TablaCategorias = ({ categorias, onModificar, onBorrar, ordenColumn
 
   return (
     <div className="tabla-categorias-container">
+      <div className="tabla-acciones-superior">
+        <SelectorColumnas
+          columnas={CATEGORIAS_COLUMNS}
+          visibleIds={visible}
+          onToggle={toggleColumn}
+          onRestaurar={() => setVisibleColumns(DEFAULT_VISIBLE)}
+          titulo="Columnas visibles"
+        />
+      </div>
       <div className="tabla-wrapper">
-        <div className="tabla-acciones-superior">
-          <SelectorColumnas
-            columnas={CATEGORIAS_COLUMNS}
-            visibleIds={visible}
-            onToggle={toggleColumn}
-            onRestaurar={() => setVisibleColumns(DEFAULT_VISIBLE)}
-            titulo="Columnas visibles"
-          />
-        </div>
         <table className="tabla-categorias">
           <thead>
             <tr>

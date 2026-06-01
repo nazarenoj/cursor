@@ -7,14 +7,35 @@ const getLogoFullUrl = (url: string | null): string | null => {
   if (!url) return null;
   if (url.startsWith('http')) return url;
   const hostname = window.location.hostname;
-  const apiBase = import.meta.env.VITE_API_URL || (hostname === 'localhost' || hostname === '127.0.0.1' ? 'http://localhost:4000/api' : window.location.origin + '/api');
+  const apiBase =
+    import.meta.env.PROD
+      ? `${window.location.origin}/api`
+      : import.meta.env.VITE_API_URL ||
+        (hostname === 'localhost' || hostname === '127.0.0.1'
+          ? 'http://localhost:4000/api'
+          : window.location.origin + '/api');
   return apiBase.replace(/\/api$/, '') + url;
 };
 
+const TIMEZONE_OPTIONS = [
+  { value: 'America/Argentina/Buenos_Aires', label: 'Argentina (Buenos Aires) UTC-3' },
+  { value: 'America/Argentina/Cordoba', label: 'Argentina (Córdoba) UTC-3' },
+  { value: 'America/Argentina/Salta', label: 'Argentina (Salta) UTC-3' },
+  { value: 'America/Montevideo', label: 'Uruguay (Montevideo) UTC-3' },
+  { value: 'America/Sao_Paulo', label: 'Brasil (São Paulo) UTC-3' },
+  { value: 'America/Santiago', label: 'Chile (Santiago) UTC-4' },
+  { value: 'America/Asuncion', label: 'Paraguay (Asunción) UTC-4' },
+  { value: 'America/Lima', label: 'Perú (Lima) UTC-5' },
+  { value: 'UTC', label: 'UTC' },
+];
+
 export const ConfiguracionClubPage = () => {
-  const { nombreClub, logoUrl, colorPrimario, loading, refreshConfig } = useClubConfig();
+  const { nombreClub, logoUrl, colorPrimario, timezone, whatsappUsarServicio, loading, refreshConfig } =
+    useClubConfig();
   const [nombre, setNombre] = useState(nombreClub);
   const [color, setColor] = useState(colorPrimario);
+  const [clubTimezone, setClubTimezone] = useState(timezone);
+  const [modoWhatsappBaileys, setModoWhatsappBaileys] = useState(whatsappUsarServicio !== false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -24,8 +45,10 @@ export const ConfiguracionClubPage = () => {
   useEffect(() => {
     setNombre(nombreClub);
     setColor(colorPrimario);
+    setClubTimezone(timezone);
+    setModoWhatsappBaileys(whatsappUsarServicio !== false);
     if (!logoFile) setLogoPreview(getLogoFullUrl(logoUrl));
-  }, [nombreClub, logoUrl, colorPrimario, logoFile]);
+  }, [nombreClub, logoUrl, colorPrimario, timezone, whatsappUsarServicio, logoFile]);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -48,6 +71,8 @@ export const ConfiguracionClubPage = () => {
       await apiService.updateClubConfig({
         nombreClub: nombre.trim() || nombreClub,
         colorPrimario: color,
+        timezone: clubTimezone,
+        whatsappUsarServicio: modoWhatsappBaileys,
         logo: logoFile ?? undefined,
       });
       await refreshConfig();
@@ -112,6 +137,53 @@ export const ConfiguracionClubPage = () => {
             />
           </div>
           <small>Se usa en la barra de navegación y botones principales.</small>
+        </div>
+
+        <div className="form-group">
+          <span className="form-label-block">Envío de mensajes WhatsApp</span>
+          <div className="whatsapp-config-opciones">
+            <label className="whatsapp-config-radio">
+              <input
+                type="radio"
+                name="modoWhatsapp"
+                checked={modoWhatsappBaileys}
+                onChange={() => setModoWhatsappBaileys(true)}
+              />
+              <span>
+                <strong>Servicio Baileys</strong> (recomendado): envío desde el servidor con texto y PDF. Requiere
+                ejecutar <code>whatsapp-service</code> y variable <code>WHATSAPP_SERVICE_URL</code> en el backend.
+                Al enviar, si no hay sesión, se muestra el código QR para vincular.
+              </span>
+            </label>
+            <label className="whatsapp-config-radio">
+              <input
+                type="radio"
+                name="modoWhatsapp"
+                checked={!modoWhatsappBaileys}
+                onChange={() => setModoWhatsappBaileys(false)}
+              />
+              <span>
+                <strong>Solo WhatsApp Web</strong>: se abre <code>wa.me</code> en el navegador por cada destinatario
+                (sin servicio Baileys).
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="timezone">Zona horaria del club</label>
+          <select
+            id="timezone"
+            value={clubTimezone}
+            onChange={(e) => setClubTimezone(e.target.value)}
+          >
+            {TIMEZONE_OPTIONS.map((tz) => (
+              <option key={tz.value} value={tz.value}>
+                {tz.label}
+              </option>
+            ))}
+          </select>
+          <small>Se usa para mostrar fechas y horas de forma consistente para todos los usuarios.</small>
         </div>
 
         <div className="form-group">

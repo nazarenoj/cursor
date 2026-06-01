@@ -1,4 +1,6 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
 import { ClubConfigProvider } from './contexts/ClubConfigContext';
 import { PermissionsProvider } from './contexts/PermissionsContext';
@@ -7,36 +9,50 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { RedirectToFirstAllowed } from './components/RedirectToFirstAllowed';
 import { Login } from './components/Login';
 import { Layout } from './components/Layout';
-import { SociosPage } from './pages/SociosPage';
-import { CategoriasPage } from './pages/CategoriasPage';
-import { LiquidacionesPage } from './pages/LiquidacionesPage';
-import { PagosPage } from './pages/PagosPage';
-import { PagosListadoPage } from './pages/PagosListadoPage';
-import { UsuariosPage } from './pages/UsuariosPage';
-import { BackupPage } from './pages/BackupPage';
-import { TesoreriaPage } from './pages/TesoreriaPage';
-import { SinPermisosPage } from './pages/SinPermisosPage';
-import { ConfiguracionClubPage } from './pages/ConfiguracionClubPage';
-import { ListaCajas } from './components/ListaCajas';
-import { ListaMediosPago } from './components/ListaMediosPago';
-import { RegistrarEgreso } from './components/RegistrarEgreso';
-import { ListaAuditoria } from './components/ListaAuditoria';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './App.css';
+
+const SociosPage = lazy(() => import('./pages/SociosPage').then((m) => ({ default: m.SociosPage })));
+const CategoriasPage = lazy(() => import('./pages/CategoriasPage').then((m) => ({ default: m.CategoriasPage })));
+const LiquidacionesPage = lazy(() => import('./pages/LiquidacionesPage').then((m) => ({ default: m.LiquidacionesPage })));
+const PagosPage = lazy(() => import('./pages/PagosPage').then((m) => ({ default: m.PagosPage })));
+const PagosListadoPage = lazy(() => import('./pages/PagosListadoPage').then((m) => ({ default: m.PagosListadoPage })));
+const UsuariosPage = lazy(() => import('./pages/UsuariosPage').then((m) => ({ default: m.UsuariosPage })));
+const BackupPage = lazy(() => import('./pages/BackupPage').then((m) => ({ default: m.BackupPage })));
+const TesoreriaPage = lazy(() => import('./pages/TesoreriaPage').then((m) => ({ default: m.TesoreriaPage })));
+const TesoreriaMovimientosPage = lazy(() => import('./pages/TesoreriaMovimientosPage').then((m) => ({ default: m.TesoreriaMovimientosPage })));
+const SinPermisosPage = lazy(() => import('./pages/SinPermisosPage').then((m) => ({ default: m.SinPermisosPage })));
+const ConfiguracionClubPage = lazy(() => import('./pages/ConfiguracionClubPage').then((m) => ({ default: m.ConfiguracionClubPage })));
+const ListaCajas = lazy(() => import('./components/ListaCajas').then((m) => ({ default: m.ListaCajas })));
+const ListaMediosPago = lazy(() => import('./components/ListaMediosPago').then((m) => ({ default: m.ListaMediosPago })));
+const RegistrarEgreso = lazy(() => import('./components/RegistrarEgreso').then((m) => ({ default: m.RegistrarEgreso })));
+const ListaAuditoria = lazy(() => import('./components/ListaAuditoria').then((m) => ({ default: m.ListaAuditoria })));
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60 * 1000,
+    },
+  },
+});
 
 function App() {
   return (
+    <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <ClubConfigProvider>
         <PermissionsProvider>
         <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route
-              path="/*"
-              element={
-                <PrivateRoute>
-                  <Layout>
-                  <Routes>
+          <ErrorBoundary>
+            <Suspense fallback={<div className="app-loading">Cargando...</div>}>
+              <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route
+                path="/*"
+                element={
+                  <PrivateRoute>
+                    <Layout>
+                    <Routes>
                     <Route path="/" element={<RedirectToFirstAllowed />} />
                     <Route
                       path="/socios"
@@ -103,6 +119,22 @@ function App() {
                       }
                     />
                     <Route
+                      path="/tesoreria/cobros"
+                      element={
+                        <ProtectedRoute permiso="tesoreria.ver">
+                          <TesoreriaPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/tesoreria/movimientos"
+                      element={
+                        <ProtectedRoute permiso="cajas.ver">
+                          <TesoreriaMovimientosPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
                       path="/cajas"
                       element={
                         <ProtectedRoute permiso="cajas.ver">
@@ -143,16 +175,19 @@ function App() {
                         </ProtectedRoute>
                       }
                     />
-                  </Routes>
-                  </Layout>
-                </PrivateRoute>
-              }
-            />
-          </Routes>
+                    </Routes>
+                    </Layout>
+                  </PrivateRoute>
+                }
+              />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </BrowserRouter>
         </PermissionsProvider>
       </ClubConfigProvider>
     </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

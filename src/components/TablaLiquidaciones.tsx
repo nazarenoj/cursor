@@ -1,7 +1,30 @@
-import { format } from 'date-fns';
 import { useState, useMemo } from 'react';
 import type { LiquidacionCuota } from '../types';
+import { useColumnPreferences } from '../hooks/useColumnPreferences';
+import { SelectorColumnas } from './SelectorColumnas';
 import './TablaLiquidaciones.css';
+import { formatDateOnlyES } from '../utils/clubDateTime';
+
+const LIQUIDACIONES_COLUMNS = [
+  { id: 'numeroSocio', label: 'N° Socio' },
+  { id: 'apellido', label: 'Apellido' },
+  { id: 'nombre', label: 'Nombre' },
+  { id: 'categoria', label: 'Categoría' },
+  { id: 'mes', label: 'Mes' },
+  { id: 'fechaLiquidacion', label: 'Fecha Liquidación' },
+  { id: 'monto', label: 'Monto' },
+  { id: 'estado', label: 'Estado' },
+  { id: 'fechaPago', label: 'Fecha Pago' },
+  { id: 'medioPago', label: 'Medio de Pago' },
+];
+const LIQUIDACIONES_DEFAULT_VISIBLE = LIQUIDACIONES_COLUMNS.map((c) => c.id);
+
+type FiltrosLiquidaciones = {
+  socio: string;
+  categoria: string;
+  mes: string;
+  estado: '' | 'pagado' | 'pendiente';
+};
 
 interface TablaLiquidacionesProps {
   liquidaciones: (LiquidacionCuota & { mes: string; fechaLiquidacion: string })[];
@@ -17,6 +40,19 @@ export const TablaLiquidaciones = ({
   onBorrar
 }: TablaLiquidacionesProps) => {
   const [ordenColumna, setOrdenColumna] = useState<{ columna: string; direccion: 'asc' | 'desc' } | null>(null);
+  const [filtros, setFiltros] = useState<FiltrosLiquidaciones>({
+    socio: '',
+    categoria: '',
+    mes: '',
+    estado: '',
+  });
+
+  const { visibleColumns, setVisibleColumns, toggleColumn, loading: loadingCols } = useColumnPreferences(
+    'liquidaciones',
+    LIQUIDACIONES_DEFAULT_VISIBLE,
+  );
+  const visible = loadingCols ? LIQUIDACIONES_DEFAULT_VISIBLE : visibleColumns;
+  const isVisible = (id: string) => visible.includes(id);
 
   const handleOrdenar = (columna: string) => {
     if (ordenColumna && ordenColumna.columna === columna) {
@@ -26,10 +62,24 @@ export const TablaLiquidaciones = ({
     }
   };
 
+  const liquidacionesFiltradas = useMemo(() => {
+    return liquidaciones.filter((l) => {
+      if (filtros.socio) {
+        const texto = `${l.numeroSocio} ${l.apellido || ''} ${l.nombre || ''}`.toLowerCase();
+        if (!texto.includes(filtros.socio.toLowerCase())) return false;
+      }
+      if (filtros.categoria && !(l.categoriaNombre || '').toLowerCase().includes(filtros.categoria.toLowerCase())) return false;
+      if (filtros.mes && l.mes !== filtros.mes) return false;
+      if (filtros.estado === 'pagado' && !l.pagado) return false;
+      if (filtros.estado === 'pendiente' && l.pagado) return false;
+      return true;
+    });
+  }, [liquidaciones, filtros]);
+
   const liquidacionesOrdenadas = useMemo(() => {
-    if (!ordenColumna) return liquidaciones;
+    if (!ordenColumna) return liquidacionesFiltradas;
     const { columna, direccion } = ordenColumna;
-    return [...liquidaciones].sort((a, b) => {
+    return [...liquidacionesFiltradas].sort((a, b) => {
       let comparacion = 0;
       switch (columna) {
         case 'numeroSocio':
@@ -67,14 +117,22 @@ export const TablaLiquidaciones = ({
       }
       return direccion === 'asc' ? comparacion : -comparacion;
     });
-  }, [liquidaciones, ordenColumna]);
+  }, [liquidacionesFiltradas, ordenColumna]);
+
+  const mesesDisponibles = useMemo(() => {
+    const meses = new Set<string>();
+    liquidaciones.forEach((l) => { if (l.mes) meses.add(l.mes); });
+    return Array.from(meses).sort().reverse();
+  }, [liquidaciones]);
+
+  const categoriasDisponibles = useMemo(() => {
+    const cats = new Set<string>();
+    liquidaciones.forEach((l) => { if (l.categoriaNombre) cats.add(l.categoriaNombre); });
+    return Array.from(cats).sort();
+  }, [liquidaciones]);
+
   const formatFecha = (fecha: string | null) => {
-    if (!fecha) return '-';
-    try {
-      return format(new Date(fecha), 'dd/MM/yyyy');
-    } catch {
-      return fecha;
-    }
+    return formatDateOnlyES(fecha);
   };
 
   const getNombreMes = (mesString: string) => {
@@ -83,22 +141,19 @@ export const TablaLiquidaciones = ({
     return fecha.toLocaleString('es-AR', { month: 'long', year: 'numeric' });
   };
 
-  const totalMonto = liquidaciones.reduce((sum, l) => sum + l.monto, 0);
-  const totalPagado = liquidaciones.filter(l => l.pagado).reduce((sum, l) => sum + l.monto, 0);
+  const totalMonto = liquidacionesFiltradas.reduce((sum, l) => sum + l.monto, 0);
+  const totalPagado = liquidacionesFiltradas.filter(l => l.pagado).reduce((sum, l) => sum + l.monto, 0);
   const totalPendiente = totalMonto - totalPagado;
 
-  const th = (id: string, label: string) => (
-    <th
-      className="sortable"
-      onClick={() => handleOrdenar(id)}
-      style={{ cursor: 'pointer', userSelect: 'none' }}
-    >
-      {label}
-      {ordenColumna?.columna === id && (
-        <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
-      )}
-    </th>
-  );
+  const th = (id: string, label: string) =>
+    isVisible(id) ? (
+      <th className="sortable" onClick={() => handleOrdenar(id)} style={{ cursor: 'pointer', userSelect: 'none' }}>
+        {label}
+        {ordenColumna?.columna === id && (
+          <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+        )}
+      </th>
+    ) : null;
 
   if (liquidaciones.length === 0) {
     return (
@@ -126,8 +181,73 @@ export const TablaLiquidaciones = ({
         </div>
         <div className="resumen-item">
           <span className="resumen-label">Cantidad de Cuotas:</span>
-          <span className="resumen-valor">{liquidaciones.length}</span>
+          <span className="resumen-valor">{liquidacionesFiltradas.length}</span>
         </div>
+      </div>
+
+      <div className="filtros-liquidaciones">
+        <div className="filtro-group">
+          <label htmlFor="filtro-socio-liq">Socio:</label>
+          <input
+            type="text"
+            id="filtro-socio-liq"
+            placeholder="N° socio, apellido, nombre"
+            value={filtros.socio}
+            onChange={(e) => setFiltros((p) => ({ ...p, socio: e.target.value }))}
+          />
+        </div>
+        <div className="filtro-group">
+          <label htmlFor="filtro-categoria-liq">Categoría:</label>
+          <select
+            id="filtro-categoria-liq"
+            value={filtros.categoria}
+            onChange={(e) => setFiltros((p) => ({ ...p, categoria: e.target.value }))}
+          >
+            <option value="">Todas</option>
+            {categoriasDisponibles.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+        <div className="filtro-group">
+          <label htmlFor="filtro-mes-liq">Mes:</label>
+          <select
+            id="filtro-mes-liq"
+            value={filtros.mes}
+            onChange={(e) => setFiltros((p) => ({ ...p, mes: e.target.value }))}
+          >
+            <option value="">Todos</option>
+            {mesesDisponibles.map((m) => (
+              <option key={m} value={m}>{getNombreMes(m)}</option>
+            ))}
+          </select>
+        </div>
+        <div className="filtro-group">
+          <label htmlFor="filtro-estado-liq">Estado:</label>
+          <select
+            id="filtro-estado-liq"
+            value={filtros.estado}
+            onChange={(e) => setFiltros((p) => ({ ...p, estado: e.target.value as FiltrosLiquidaciones['estado'] }))}
+          >
+            <option value="">Todos</option>
+            <option value="pagado">Pagado</option>
+            <option value="pendiente">Pendiente</option>
+          </select>
+        </div>
+        <div className="filtro-acciones">
+          <button type="button" className="btn-limpiar" onClick={() => setFiltros({ socio: '', categoria: '', mes: '', estado: '' })}>
+            Limpiar filtros
+          </button>
+        </div>
+      </div>
+
+      <div className="tabla-acciones-liquidaciones">
+        <SelectorColumnas
+          columnas={LIQUIDACIONES_COLUMNS}
+          visibleIds={visible}
+          onToggle={toggleColumn}
+          onRestaurar={() => setVisibleColumns(LIQUIDACIONES_DEFAULT_VISIBLE)}
+        />
       </div>
 
       <div className="tabla-wrapper">
@@ -150,20 +270,22 @@ export const TablaLiquidaciones = ({
           <tbody>
             {liquidacionesOrdenadas.map(liquidacion => (
               <tr key={liquidacion.id} className={liquidacion.pagado ? 'pagado' : ''}>
-                <td>{liquidacion.numeroSocio}</td>
-                <td>{liquidacion.apellido}</td>
-                <td>{liquidacion.nombre}</td>
-                <td>{liquidacion.categoriaNombre}</td>
-                <td>{getNombreMes(liquidacion.mes)}</td>
-                <td>{formatFecha(liquidacion.fechaLiquidacion)}</td>
-                <td className="monto">${liquidacion.monto.toFixed(2)}</td>
-                <td>
-                  <span className={`badge ${liquidacion.pagado ? 'badge-pagado' : 'badge-pendiente'}`}>
-                    {liquidacion.pagado ? 'Pagado' : 'Pendiente'}
-                  </span>
-                </td>
-                <td>{formatFecha(liquidacion.fechaPago)}</td>
-                <td>{liquidacion.medioPago ?? '-'}</td>
+                {isVisible('numeroSocio') && <td>{liquidacion.numeroSocio}</td>}
+                {isVisible('apellido') && <td>{liquidacion.apellido}</td>}
+                {isVisible('nombre') && <td>{liquidacion.nombre}</td>}
+                {isVisible('categoria') && <td>{liquidacion.categoriaNombre}</td>}
+                {isVisible('mes') && <td>{getNombreMes(liquidacion.mes)}</td>}
+                {isVisible('fechaLiquidacion') && <td>{formatFecha(liquidacion.fechaLiquidacion)}</td>}
+                {isVisible('monto') && <td className="monto">${liquidacion.monto.toFixed(2)}</td>}
+                {isVisible('estado') && (
+                  <td>
+                    <span className={`badge ${liquidacion.pagado ? 'badge-pagado' : 'badge-pendiente'}`}>
+                      {liquidacion.pagado ? 'Pagado' : 'Pendiente'}
+                    </span>
+                  </td>
+                )}
+                {isVisible('fechaPago') && <td>{formatFecha(liquidacion.fechaPago)}</td>}
+                {isVisible('medioPago') && <td>{liquidacion.medioPago ?? '-'}</td>}
                 <td>
                   <div className="acciones">
                     {!liquidacion.pagado ? (

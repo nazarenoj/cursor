@@ -2,13 +2,17 @@ const express = require('express');
 const { query, withTransaction } = require('../db');
 const asyncHandler = require('../utils/asyncHandler');
 const { authenticateToken } = require('../middleware/auth');
-const { requirePermission } = require('../middleware/permissions');
+const { requirePermission, checkPermission } = require('../middleware/permissions');
+const { registrarAuditoria } = require('../middleware/auditoria');
 
 const router = express.Router();
 
-// Todas las rutas requieren autenticación y permiso de usuarios
+const PERMISOS_COLUMNS = 'id, codigo, nombre, descripcion, created_at';
+
+// Todas las rutas requieren autenticación
 router.use(authenticateToken);
-router.use(requirePermission('usuarios'));
+// Auditoría DESPUÉS de autenticación para que req.user esté disponible
+router.use(registrarAuditoria);
 
 const mapPermiso = (row) => ({
   id: row.id,
@@ -20,8 +24,9 @@ const mapPermiso = (row) => ({
 // Obtener todos los permisos
 router.get(
   '/permisos',
+  requirePermission('usuarios.permisos'),
   asyncHandler(async (_req, res) => {
-    const rows = await query('SELECT * FROM permisos ORDER BY nombre ASC');
+    const rows = await query(`SELECT ${PERMISOS_COLUMNS} FROM permisos ORDER BY nombre ASC`);
     res.json(rows.map(mapPermiso));
   }),
 );
@@ -30,7 +35,19 @@ router.get(
 router.get(
   '/usuarios/:id/permisos',
   asyncHandler(async (req, res) => {
+    // Permitir que un usuario vea sus propios permisos, o que admin/jnazareno vean cualquier permiso
     const usuarioId = Number(req.params.id);
+    const esAdminOJnazareno = req.user?.usuario === 'admin' || req.user?.usuario === 'jnazareno';
+    const esSuPropioUsuario = req.user?.id === usuarioId;
+    
+    if (!esAdminOJnazareno && !esSuPropioUsuario) {
+      // Si no es admin/jnazareno ni está consultando sus propios permisos, verificar permiso
+      const tienePermiso = await checkPermission(req.user.id, 'usuarios.permisos');
+      if (!tienePermiso) {
+        return res.status(403).json({ message: 'No tiene permiso para acceder a esta funcionalidad' });
+      }
+    }
+    
     const rows = await query(
       `SELECT p.id, p.codigo, p.nombre, p.descripcion
        FROM permisos p
@@ -46,6 +63,7 @@ router.get(
 // Asignar permisos a un usuario
 router.put(
   '/usuarios/:id/permisos',
+  requirePermission('usuarios.permisos'),
   asyncHandler(async (req, res) => {
     const usuarioId = Number(req.params.id);
     const { permisoIds } = req.body || {};

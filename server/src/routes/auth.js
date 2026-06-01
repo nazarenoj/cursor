@@ -3,12 +3,14 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query } = require('../db');
 const asyncHandler = require('../utils/asyncHandler');
-const { JWT_SECRET } = require('../middleware/auth');
+const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
+const { registrarAuditoria } = require('../middleware/auditoria');
 
 const router = express.Router();
 
 router.post(
   '/auth/login',
+  registrarAuditoria,
   asyncHandler(async (req, res) => {
     const { usuario, password } = req.body || {};
 
@@ -63,32 +65,23 @@ router.post(
 
 router.get(
   '/auth/me',
+  authenticateToken,
   asyncHandler(async (req, res) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const rows = await query(
+      'SELECT id, usuario, activo FROM usuarios WHERE id = ? LIMIT 1',
+      [req.user.id],
+    );
 
-    if (!token) {
-      return res.status(401).json({ message: 'Token no proporcionado' });
+    if (rows.length === 0 || !rows[0].activo) {
+      const error = new Error('Usuario no encontrado o inactivo');
+      error.status = 401;
+      throw error;
     }
 
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET);
-      const rows = await query(
-        'SELECT id, usuario, activo FROM usuarios WHERE id = ? LIMIT 1',
-        [decoded.id],
-      );
-
-      if (rows.length === 0 || !rows[0].activo) {
-        return res.status(401).json({ message: 'Usuario no encontrado o inactivo' });
-      }
-
-      res.json({
-        id: rows[0].id,
-        usuario: rows[0].usuario,
-      });
-    } catch (err) {
-      return res.status(401).json({ message: 'Token inválido' });
-    }
+    res.json({
+      id: rows[0].id,
+      usuario: rows[0].usuario,
+    });
   }),
 );
 

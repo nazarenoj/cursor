@@ -10,10 +10,28 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+server/public
 *.local
 
-# Backend environment
+# Environment (raíz y servidor)
+.env
+.env.*
+!.env.example
 server/.env
+server/.env.*
+server/*copia.env
+server/.env*
+
+# Backups, releases y artefactos locales
+server/backups/
+server/backups1/
+server/*.zip
+deploy-output/
+
+# Sesión WhatsApp (Baileys); no versionar credenciales
+whatsapp-service/auth_wa/
+whatsapp-service/.env
+server/whatsapp_auth/
 
 # Editor directories and files
 .vscode/*

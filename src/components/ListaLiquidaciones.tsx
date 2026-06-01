@@ -1,18 +1,38 @@
-import { useState, useMemo } from 'react';
-import { Pie } from 'react-chartjs-2';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { lazy, Suspense, useMemo, useState, useRef, useEffect } from 'react';
+import { Pie, Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement } from 'chart.js';
 import type { ChartOptions, TooltipItem } from 'chart.js';
+import { useClubConfig } from '../contexts/ClubConfigContext';
+import { useCategorias } from '../hooks/useCategorias';
+import { useFilterPreferences } from '../hooks/useFilterPreferences';
 import { useLiquidaciones } from '../hooks/useLiquidaciones';
-import { useSocios } from '../hooks/useSocios';
-import { FormularioLiquidacion } from './FormularioLiquidacion';
-import { FormularioLiquidacionSocios } from './FormularioLiquidacionSocios';
-import { TablaLiquidaciones } from './TablaLiquidaciones';
+import { SelectorColumnas } from './SelectorColumnas';
 import { TablaLiquidacionesMensuales } from './TablaLiquidacionesMensuales';
-import { ImprimirLiquidaciones } from './ImprimirLiquidaciones';
-import { EnviarWhatsApp } from './EnviarWhatsApp';
+import { ErrorBoundary } from './ErrorBoundary';
 import './ListaLiquidaciones.css';
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement);
+
+const FormularioLiquidacion = lazy(() =>
+  import('./FormularioLiquidacion').then((m) => ({ default: m.FormularioLiquidacion })),
+);
+const FormularioLiquidacionSocios = lazy(() =>
+  import('./FormularioLiquidacionSocios').then((m) => ({ default: m.FormularioLiquidacionSocios })),
+);
+const TablaLiquidaciones = lazy(() =>
+  import('./TablaLiquidaciones').then((m) => ({ default: m.TablaLiquidaciones })),
+);
+const EnviarWhatsApp = lazy(() =>
+  import('./EnviarWhatsApp').then((m) => ({ default: m.EnviarWhatsApp })),
+);
+
+const LIQUIDACIONES_FILTROS = [
+  { id: 'categoria', label: 'Categoría(s)' },
+  { id: 'socio', label: 'Socio (nombre o número)' },
+  { id: 'año', label: 'Año' },
+  { id: 'fecha', label: 'Mes de liquidación (desde / hasta)' },
+];
+const LIQUIDACIONES_FILTROS_DEFAULT = LIQUIDACIONES_FILTROS.map((f) => f.id);
 
 export const ListaLiquidaciones = () => {
   const { 
@@ -30,79 +50,50 @@ export const ListaLiquidaciones = () => {
     loading: loadingLiquidaciones,
     error: errorLiquidaciones,
   } = useLiquidaciones();
-  const { socios } = useSocios();
-  
+  const { categorias } = useCategorias();
+  const { nombreClub } = useClubConfig();
+
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [mostrarFormularioSocios, setMostrarFormularioSocios] = useState(false);
   const [mesDetalle, setMesDetalle] = useState<string | null>(null);
-  const [mesImpresion, setMesImpresion] = useState<string | null>(null);
-  const [mostrarImpresion, setMostrarImpresion] = useState(false);
   const [mostrarWhatsApp, setMostrarWhatsApp] = useState(false);
   const [liquidacionMensualWhatsApp, setLiquidacionMensualWhatsApp] = useState<number | undefined>(undefined);
   const [error, setError] = useState<string>('');
   const [mostrarGrafico, setMostrarGrafico] = useState(false);
+  const [modalGrafico, setModalGrafico] = useState<'pie' | 'barras' | null>(null);
+  const [filtroCategoriaIds, setFiltroCategoriaIds] = useState<number[]>([]);
+  const [filtroSocioTexto, setFiltroSocioTexto] = useState('');
+  const [filtroAño, setFiltroAño] = useState('');
   const [filtroDesde, setFiltroDesde] = useState('');
   const [filtroHasta, setFiltroHasta] = useState('');
-  const [filtroMes, setFiltroMes] = useState('');
-  const [filtroSocioId, setFiltroSocioId] = useState<number | ''>('');
+  const [filtroCategoriasAbierto, setFiltroCategoriasAbierto] = useState(false);
+  const refFiltroCategorias = useRef<HTMLDivElement>(null);
 
-  const totalLiquidado = useMemo(
-    () => liquidacionesCuotas.reduce((sum, cuota) => sum + cuota.monto, 0),
-    [liquidacionesCuotas],
-  );
-  const totalCobrado = useMemo(
-    () => liquidacionesCuotas.filter((cuota) => cuota.pagado).reduce((sum, cuota) => sum + cuota.monto, 0),
-    [liquidacionesCuotas],
-  );
-  const totalAdeudado = useMemo(
-    () => Math.max(totalLiquidado - totalCobrado, 0),
-    [totalLiquidado, totalCobrado],
-  );
-
-  const graficoData = useMemo(() => {
-    if (totalLiquidado <= 0) {
-      return null;
-    }
-    const porcentajePagado = totalCobrado > 0 ? (totalCobrado / totalLiquidado) * 100 : 0;
-    const porcentajeAdeudado = Math.max(100 - porcentajePagado, 0);
-    return {
-      labels: ['Pagado (%)', 'Adeudado (%)'],
-      datasets: [
-        {
-          label: 'Distribución porcentual',
-          data: [Number(porcentajePagado.toFixed(2)), Number(porcentajeAdeudado.toFixed(2))],
-          backgroundColor: ['rgba(72, 187, 120, 0.8)', 'rgba(244, 114, 182, 0.8)'],
-          borderColor: ['rgba(56, 161, 105, 1)', 'rgba(236, 72, 153, 1)'],
-          borderWidth: 1,
-        },
-      ],
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (refFiltroCategorias.current && !refFiltroCategorias.current.contains(e.target as Node)) {
+        setFiltroCategoriasAbierto(false);
+      }
     };
-  }, [totalLiquidado, totalCobrado]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  const graficoOptions: ChartOptions<'pie'> = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'bottom',
-        labels: {
-          boxWidth: 16,
-        },
-      },
-      tooltip: {
-        callbacks: {
-          label: (context: TooltipItem<'pie'>) => {
-            const label = context.label || '';
-            const value = typeof context.parsed === 'number' ? context.parsed : 0;
-            const monto = label.startsWith('Pagado') ? totalCobrado : totalAdeudado;
-            return `${label}: ${value.toFixed(2)}% ($${monto.toLocaleString('es-AR', {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })})`;
-          },
-        },
-      },
-    },
-  };
+  useEffect(() => {
+    if (!modalGrafico) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setModalGrafico(null);
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [modalGrafico]);
+
+  const {
+    visibleFilters,
+    setVisibleFilters,
+    toggleFilter,
+    isFilterVisible,
+  } = useFilterPreferences('liquidaciones-filtros', LIQUIDACIONES_FILTROS_DEFAULT);
 
   // Función helper para obtener el mes de una cuota
   const getMesDeCuota = (cuota: typeof liquidacionesCuotas[0]): string => {
@@ -144,91 +135,148 @@ const getNombreMes = (mesString: string) => {
 
   const liquidacionesFiltradas = useMemo(() => {
     return todasLiquidaciones.filter((cuota) => {
-      // Filtro por fecha desde
-      if (filtroDesde) {
-        const fechaLiquidacion = cuota.fechaLiquidacion || '';
-        const fechaComparar = fechaLiquidacion ? new Date(fechaLiquidacion) : null;
-        if (!fechaComparar || fechaComparar < new Date(filtroDesde)) {
+      if (filtroCategoriaIds.length > 0 && !filtroCategoriaIds.includes(cuota.categoriaId)) {
+        return false;
+      }
+      if (filtroSocioTexto.trim()) {
+        const texto = filtroSocioTexto.trim().toLowerCase();
+        const numeroStr = String(cuota.numeroSocio ?? '').toLowerCase();
+        const apellido = (cuota.apellido ?? '').toLowerCase();
+        const nombre = (cuota.nombre ?? '').toLowerCase();
+        const matchNumero = numeroStr.includes(texto);
+        const matchApellido = apellido.includes(texto);
+        const matchNombre = nombre.includes(texto);
+        const matchNombreCompleto = `${apellido} ${nombre}`.trim().includes(texto) || `${nombre} ${apellido}`.trim().includes(texto);
+        if (!matchNumero && !matchApellido && !matchNombre && !matchNombreCompleto) {
           return false;
         }
       }
-      // Filtro por fecha hasta
-      if (filtroHasta) {
-        const fechaLiquidacion = cuota.fechaLiquidacion || '';
-        const fechaComparar = fechaLiquidacion ? new Date(fechaLiquidacion) : null;
-        if (!fechaComparar || fechaComparar > new Date(filtroHasta)) {
-          return false;
-        }
+      if (filtroAño && !cuota.mes.startsWith(filtroAño)) {
+        return false;
       }
-      // Filtro por mes de liquidación
-      if (filtroMes) {
-        if (cuota.mes !== filtroMes) {
-          return false;
-        }
-      }
-      // Filtro por socio
-      if (filtroSocioId !== '') {
-        const socioIdNumero = Number(filtroSocioId);
-        if (cuota.socioId !== socioIdNumero) {
-          return false;
-        }
-      }
+      const mesDesde = filtroDesde || '';
+      const mesHasta = filtroHasta || '';
+      if (mesDesde && cuota.mes < mesDesde) return false;
+      if (mesHasta && cuota.mes > mesHasta) return false;
       return true;
     });
-  }, [todasLiquidaciones, filtroDesde, filtroHasta, filtroMes, filtroSocioId]);
+  }, [todasLiquidaciones, filtroCategoriaIds, filtroSocioTexto, filtroAño, filtroDesde, filtroHasta]);
 
   const cuotasOrdenadas = useMemo(() => {
     return [...liquidacionesFiltradas].sort(ordenarPorMes);
   }, [liquidacionesFiltradas]);
 
-  // Filtrar liquidaciones mensuales basándose en los filtros
+  // Filtrar liquidaciones mensuales: por año, por fecha desde/hasta y solo las que tienen al menos una cuota que pasa los filtros
   const liquidacionesMensualesFiltradas = useMemo(() => {
-    let filtradas = [...liquidacionesMensuales];
-    
-    // Filtro por mes de liquidación
-    if (filtroMes) {
-      filtradas = filtradas.filter(lm => lm.mes === filtroMes);
+    const idsConCuotas = new Set(cuotasOrdenadas.map(c => c.liquidacionMensualId));
+    let filtradas = liquidacionesMensuales.filter(lm => idsConCuotas.has(lm.id));
+    if (filtroAño) {
+      filtradas = filtradas.filter(lm => lm.mes.startsWith(filtroAño));
     }
-    
-    // Filtro por socio - solo mostrar liquidaciones que tienen cuotas del socio seleccionado
-    if (filtroSocioId !== '') {
-      const socioIdNumero = Number(filtroSocioId);
-      const liquidacionesIdsConSocio = new Set(
-        cuotasOrdenadas
-          .filter(cuota => cuota.socioId === socioIdNumero)
-          .map(cuota => cuota.liquidacionMensualId)
-      );
-      filtradas = filtradas.filter(lm => liquidacionesIdsConSocio.has(lm.id));
-    }
-    
-    // Filtro por fecha desde
-    if (filtroDesde) {
-      filtradas = filtradas.filter(lm => {
-        if (!lm.fechaLiquidacion) return false;
-        const fechaComparar = new Date(lm.fechaLiquidacion);
-        return fechaComparar >= new Date(filtroDesde);
-      });
-    }
-    
-    // Filtro por fecha hasta
-    if (filtroHasta) {
-      filtradas = filtradas.filter(lm => {
-        if (!lm.fechaLiquidacion) return false;
-        const fechaComparar = new Date(lm.fechaLiquidacion);
-        return fechaComparar <= new Date(filtroHasta);
-      });
-    }
-    
+    const mesDesde = filtroDesde || '';
+    const mesHasta = filtroHasta || '';
+    if (mesDesde) filtradas = filtradas.filter(lm => lm.mes >= mesDesde);
+    if (mesHasta) filtradas = filtradas.filter(lm => lm.mes <= mesHasta);
     return filtradas;
-  }, [liquidacionesMensuales, filtroMes, filtroSocioId, filtroDesde, filtroHasta, cuotasOrdenadas]);
+  }, [liquidacionesMensuales, filtroAño, filtroDesde, filtroHasta, cuotasOrdenadas]);
 
   const obtenerCuotasPorMes = (mes: string) => cuotasOrdenadas.filter(l => l.mes === mes);
 
+  const añosDisponibles = useMemo(() => {
+    const años = new Set<string>(liquidacionesMensuales.map(lm => lm.mes.substring(0, 4)));
+    const añoActual = new Date().getFullYear().toString();
+    años.add(añoActual);
+    return [...años].sort((a, b) => Number(b) - Number(a));
+  }, [liquidacionesMensuales]);
+
+  // Totales y gráficos a partir de cuotas filtradas
+  const totalLiquidado = useMemo(
+    () => cuotasOrdenadas.reduce((sum, cuota) => sum + cuota.monto, 0),
+    [cuotasOrdenadas],
+  );
+  const totalCobrado = useMemo(
+    () => cuotasOrdenadas.filter((cuota) => cuota.pagado).reduce((sum, cuota) => sum + cuota.monto, 0),
+    [cuotasOrdenadas],
+  );
+  const totalAdeudado = useMemo(
+    () => Math.max(totalLiquidado - totalCobrado, 0),
+    [totalLiquidado, totalCobrado],
+  );
+
+  const graficoData = useMemo(() => {
+    if (totalLiquidado <= 0) return null;
+    const porcentajePagado = totalCobrado > 0 ? (totalCobrado / totalLiquidado) * 100 : 0;
+    const porcentajeAdeudado = Math.max(100 - porcentajePagado, 0);
+    return {
+      labels: ['Pagado (%)', 'Adeudado (%)'],
+      datasets: [
+        {
+          label: 'Distribución porcentual',
+          data: [Number(porcentajePagado.toFixed(2)), Number(porcentajeAdeudado.toFixed(2))],
+          backgroundColor: ['rgba(72, 187, 120, 0.8)', 'rgba(244, 114, 182, 0.8)'],
+          borderColor: ['rgba(56, 161, 105, 1)', 'rgba(236, 72, 153, 1)'],
+          borderWidth: 1,
+        },
+      ],
+    };
+  }, [totalLiquidado, totalCobrado]);
+
+  const graficoOptions: ChartOptions<'pie'> = useMemo(() => ({
+    responsive: true,
+    plugins: {
+      legend: { position: 'bottom' as const, labels: { boxWidth: 16 } },
+      tooltip: {
+        callbacks: {
+          label: (context: TooltipItem<'pie'>) => {
+            const label = context.label || '';
+            const value = typeof context.parsed === 'number' ? context.parsed : 0;
+            const monto = label.startsWith('Pagado') ? totalCobrado : totalAdeudado;
+            return `${label}: ${value.toFixed(2)}% ($${monto.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+          },
+        },
+      },
+    },
+  }), [totalCobrado, totalAdeudado]);
+
+  // Gráfico de barras: cobrado vs liquidado por liquidación mensual (datos filtrados)
+  const graficoBarrasData = useMemo(() => {
+    const ordenadas = [...liquidacionesMensualesFiltradas].sort((a, b) => a.mes.localeCompare(b.mes));
+    if (ordenadas.length === 0) return null;
+    const labels = ordenadas.map(lm => {
+      const [año, mes] = lm.mes.split('-');
+      const d = new Date(parseInt(año), parseInt(mes) - 1, 1);
+      return d.toLocaleString('es-AR', { month: 'short', year: '2-digit' });
+    });
+    const liquidadoPorMes = ordenadas.map(lm => {
+      const cuotas = cuotasOrdenadas.filter(c => c.liquidacionMensualId === lm.id);
+      return cuotas.reduce((s, c) => s + c.monto, 0);
+    });
+    const cobradoPorMes = ordenadas.map(lm => {
+      const cuotas = cuotasOrdenadas.filter(c => c.liquidacionMensualId === lm.id && c.pagado);
+      return cuotas.reduce((s, c) => s + c.monto, 0);
+    });
+    return {
+      labels,
+      datasets: [
+        { label: 'Liquidado', data: liquidadoPorMes, backgroundColor: 'rgba(102, 126, 234, 0.8)', borderColor: 'rgb(102, 126, 234)', borderWidth: 1 },
+        { label: 'Cobrado', data: cobradoPorMes, backgroundColor: 'rgba(72, 187, 120, 0.8)', borderColor: 'rgb(56, 161, 105)', borderWidth: 1 },
+      ],
+    };
+  }, [liquidacionesMensualesFiltradas, cuotasOrdenadas]);
+
+  const graficoBarrasOptions: ChartOptions<'bar'> = useMemo(() => ({
+    responsive: true,
+    plugins: { legend: { position: 'top' as const } },
+    scales: {
+      x: { stacked: false },
+      y: { beginAtZero: true, ticks: { callback: (v) => (typeof v === 'number' ? `$${v.toLocaleString('es-AR')}` : v) } },
+    },
+  }), []);
+
   const handleGenerar = async (mes: string, reemplazarSiNoPagada?: boolean) => {
-    const socioId = filtroSocioId !== '' ? Number(filtroSocioId) : undefined;
     try {
       setError('');
-      const resultado = await generarLiquidacionMensual(mes, socioId, reemplazarSiNoPagada);
+      const resultado = await generarLiquidacionMensual(mes, undefined, reemplazarSiNoPagada);
 
       if (resultado.yaExisteNoPagada && !reemplazarSiNoPagada) {
         const confirmar = window.confirm(
@@ -267,21 +315,25 @@ const getNombreMes = (mesString: string) => {
     }
   };
 
-  const handleGenerarPorSocios = async (socioIds: number[], meses: string[]) => {
+  const handleGenerarPorSocios = async (pares: Array<{ socioId: number; mes: string }>) => {
+    if (pares.length === 0) return;
     try {
       setError('');
-      const resultado = await generarLiquidacionesPorSocios(socioIds, meses);
-      setMostrarFormularioSocios(false);
-      
-      let mensaje = `Liquidaciones generadas exitosamente:\n` +
-        `- ${resultado.totalMeses} mes(es) procesado(s)\n` +
-        `- ${resultado.totalCuotasCreadas} cuota(s) creada(s)\n` +
-        `- ${socioIds.length} socio(s) seleccionado(s)`;
-      if (resultado.totalSociosNuevosIncluidos != null && resultado.totalSociosNuevosIncluidos > 0) {
-        mensaje += `\n- ${resultado.totalSociosNuevosIncluidos} socio(s) activo(s) sin liquidación previa incluidos en los meses.`;
+      const porMes = new Map<string, number[]>();
+      for (const { socioId, mes } of pares) {
+        if (!porMes.has(mes)) porMes.set(mes, []);
+        porMes.get(mes)!.push(socioId);
       }
-      alert(mensaje);
-      // Recargar liquidaciones para mostrar las nuevas
+      let totalCuotasCreadas = 0;
+      for (const [mes, socioIds] of porMes) {
+        const unicos = [...new Set(socioIds)];
+        const resultado = await generarLiquidacionesPorSocios(unicos, [mes]);
+        totalCuotasCreadas += resultado.totalCuotasCreadas;
+      }
+      setMostrarFormularioSocios(false);
+      alert(
+        `Liquidaciones generadas exitosamente.\n${totalCuotasCreadas} cuota(s) creada(s) en ${porMes.size} mes(es).`,
+      );
       await loadLiquidaciones();
     } catch (err) {
       const mensaje = err instanceof Error ? err.message : 'Error al generar las liquidaciones';
@@ -350,17 +402,19 @@ const getNombreMes = (mesString: string) => {
     setMesDetalle(null);
   };
 
-  const handleImprimirMes = (mes?: string) => {
-    if (mes && obtenerCuotasPorMes(mes).length === 0) {
-      alert('No hay liquidaciones para imprimir en el mes seleccionado');
+  const handleExportarPdf = async (mes?: string) => {
+    const liquidacionesParaExportar = mes ? obtenerCuotasPorMes(mes) : cuotasOrdenadas;
+    if (liquidacionesParaExportar.length === 0) {
+      alert(mes ? 'No hay liquidaciones para exportar en el mes seleccionado' : 'No hay liquidaciones para exportar');
       return;
     }
-    if (!mes && cuotasOrdenadas.length === 0) {
-      alert('No hay liquidaciones para imprimir');
-      return;
+    try {
+      const { exportarLiquidacionesPdf } = await import('../utils/exportLiquidacionesPdf');
+      await exportarLiquidacionesPdf(liquidacionesParaExportar, mes ?? '', nombreClub);
+    } catch (error) {
+      console.error(error);
+      alert('No se pudo exportar el PDF.');
     }
-    setMesImpresion(mes || null);
-    setMostrarImpresion(true);
   };
 
   const handleEnviarWhatsApp = (liquidacionMensualId?: number) => {
@@ -391,40 +445,29 @@ const getNombreMes = (mesString: string) => {
 
   if (mostrarWhatsApp) {
     return (
-      <EnviarWhatsApp
-        liquidacionMensualId={liquidacionMensualWhatsApp}
-        onVolver={handleCerrarWhatsApp}
-      />
-    );
-  }
-
-  if (mostrarImpresion) {
-    const liquidacionesParaImpresion = mesImpresion
-      ? obtenerCuotasPorMes(mesImpresion)
-      : cuotasOrdenadas;
-
-    return (
-      <ImprimirLiquidaciones
-        liquidaciones={liquidacionesParaImpresion}
-        mesFiltro={mesImpresion ?? ''}
-        onVolver={() => {
-          setMostrarImpresion(false);
-          setMesImpresion(null);
-        }}
-      />
+      <Suspense fallback={<div className="lista-liquidaciones"><p>Cargando mensajes...</p></div>}>
+        <EnviarWhatsApp
+          liquidacionMensualId={liquidacionMensualWhatsApp}
+          onVolver={handleCerrarWhatsApp}
+        />
+      </Suspense>
     );
   }
 
   if (mostrarFormularioSocios) {
     return (
       <div className="lista-liquidaciones">
-        <FormularioLiquidacionSocios
-          onGenerar={handleGenerarPorSocios}
-          onCancel={() => {
-            setMostrarFormularioSocios(false);
-            setError('');
-          }}
-        />
+        <Suspense fallback={<p>Cargando formulario...</p>}>
+          <FormularioLiquidacionSocios
+            liquidacionesCuotas={liquidacionesCuotas}
+            liquidacionesMensuales={liquidacionesMensuales}
+            onGenerar={handleGenerarPorSocios}
+            onCancel={() => {
+              setMostrarFormularioSocios(false);
+              setError('');
+            }}
+          />
+        </Suspense>
         {error && (
           <div className="error-message">
             {error}
@@ -435,17 +478,17 @@ const getNombreMes = (mesString: string) => {
   }
 
   if (mostrarFormulario) {
-    const socioFiltro = filtroSocioId !== '' ? socios.find((s) => s.id === filtroSocioId) : null;
     return (
       <div className="lista-liquidaciones">
-        <FormularioLiquidacion
-          onGenerar={handleGenerar}
-          soloParaSocio={socioFiltro ? `${socioFiltro.apellido}, ${socioFiltro.nombre}` : undefined}
-          onCancel={() => {
-            setMostrarFormulario(false);
-            setError('');
-          }}
-        />
+        <Suspense fallback={<p>Cargando formulario...</p>}>
+          <FormularioLiquidacion
+            onGenerar={handleGenerar}
+            onCancel={() => {
+              setMostrarFormulario(false);
+              setError('');
+            }}
+          />
+        </Suspense>
         {error && (
           <div className="error-message">
             {error}
@@ -467,7 +510,7 @@ const getNombreMes = (mesString: string) => {
             <button onClick={handleCerrarDetalle} className="btn-volver">
               ← Volver al listado
             </button>
-                <button onClick={() => handleImprimirMes(mesDetalle)} className="btn-imprimir">
+                <button onClick={() => handleExportarPdf(mesDetalle)} className="btn-imprimir">
                   📄 Exportar PDF
                 </button>
             {(() => {
@@ -476,9 +519,9 @@ const getNombreMes = (mesString: string) => {
                 <button
                   onClick={() => handleEnviarWhatsApp(liquidacionMensual.id)}
                   className="btn-whatsapp"
-                  title="Enviar por WhatsApp"
+                  title="Mensajes a socios (WhatsApp)"
                 >
-                  📱 Enviar WhatsApp
+                  📱 Mensajes a socios
                 </button>
               ) : null;
             })()}
@@ -493,12 +536,14 @@ const getNombreMes = (mesString: string) => {
         </div>
 
         <div className="detalle-tabla-liquidaciones-wrapper">
-          <TablaLiquidaciones
-            liquidaciones={detalle}
-            onMarcarPagado={handleMarcarPagado}
-            onMarcarNoPagado={handleMarcarNoPagado}
-            onBorrar={handleBorrar}
-          />
+          <Suspense fallback={<p>Cargando detalle...</p>}>
+            <TablaLiquidaciones
+              liquidaciones={detalle}
+              onMarcarPagado={handleMarcarPagado}
+              onMarcarNoPagado={handleMarcarNoPagado}
+              onBorrar={handleBorrar}
+            />
+          </Suspense>
         </div>
       </div>
     );
@@ -508,74 +553,97 @@ const getNombreMes = (mesString: string) => {
     <div className="lista-liquidaciones lista-liquidaciones-principal">
       <div className="lista-header">
         <h1>Gestión de Liquidaciones Mensuales</h1>
-        <div className="filtros-fecha">
-          <div className="filtro">
-            <label htmlFor="liquidaciones-desde">Fecha desde</label>
-            <input
-              id="liquidaciones-desde"
-              type="date"
-              value={filtroDesde}
-              onChange={(e) => setFiltroDesde(e.target.value)}
-            />
-          </div>
-          <div className="filtro">
-            <label htmlFor="liquidaciones-hasta">Fecha hasta</label>
-            <input
-              id="liquidaciones-hasta"
-              type="date"
-              value={filtroHasta}
-              onChange={(e) => setFiltroHasta(e.target.value)}
-            />
-          </div>
-          <div className="filtro">
-            <label htmlFor="liquidaciones-mes">Mes de liquidación</label>
-            <input
-              id="liquidaciones-mes"
-              type="month"
-              value={filtroMes}
-              onChange={(e) => setFiltroMes(e.target.value)}
-            />
-          </div>
-          <div className="filtro">
-            <label htmlFor="liquidaciones-socio">Socio</label>
-            <select
-              id="liquidaciones-socio"
-              value={filtroSocioId}
-              onChange={(e) => setFiltroSocioId(e.target.value === '' ? '' : Number(e.target.value))}
-            >
-              <option value="">Todos los socios</option>
-              {socios.map((socio) => (
-                <option key={socio.id} value={socio.id}>
-                  #{socio.numeroSocio} - {socio.apellido}, {socio.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
       </div>
 
-      {mostrarGrafico && graficoData && (
-        <div className="grafico-liquidaciones">
-          <Pie data={graficoData} options={graficoOptions} />
-          <div className="resumen-grafico">
-            <div>
-              <span>Total liquidado:</span> ${totalLiquidado.toLocaleString('es-AR', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+      {mostrarGrafico && (graficoData || graficoBarrasData) && (
+        <div className="graficos-liquidaciones-wrapper">
+          <div
+            className="grafico-liquidaciones grafico-clickeable"
+            role="button"
+            tabIndex={0}
+            onClick={() => graficoData && setModalGrafico('pie')}
+            onKeyDown={(e) => graficoData && (e.key === 'Enter' || e.key === ' ') && setModalGrafico('pie')}
+            title="Clic para ampliar"
+          >
+            {graficoData && (
+              <>
+                <ErrorBoundary compact message="El gráfico no pudo mostrarse.">
+                  <Pie data={graficoData} options={graficoOptions} />
+                </ErrorBoundary>
+                <div className="resumen-grafico">
+                  <div>
+                    <span>Total liquidado:</span> ${totalLiquidado.toLocaleString('es-AR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </div>
+                  <div>
+                    <span>Total cobrado:</span> ${totalCobrado.toLocaleString('es-AR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </div>
+                  <div>
+                    <span>Total adeudado:</span> ${totalAdeudado.toLocaleString('es-AR', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          {graficoBarrasData && (
+            <div
+              className="grafico-barras-liquidaciones grafico-clickeable"
+              role="button"
+              tabIndex={0}
+              onClick={() => setModalGrafico('barras')}
+              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setModalGrafico('barras')}
+              title="Clic para ampliar"
+            >
+              <h3 className="grafico-barras-titulo">Cobrado vs Liquidado por liquidación</h3>
+              <ErrorBoundary compact message="El gráfico no pudo mostrarse.">
+                <Bar data={graficoBarrasData} options={graficoBarrasOptions} />
+              </ErrorBoundary>
             </div>
-            <div>
-              <span>Total cobrado:</span> ${totalCobrado.toLocaleString('es-AR', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </div>
-            <div>
-              <span>Total adeudado:</span> ${totalAdeudado.toLocaleString('es-AR', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
-            </div>
+          )}
+        </div>
+      )}
+
+      {modalGrafico && (
+        <div
+          className="modal-grafico-overlay"
+          onClick={() => setModalGrafico(null)}
+          onKeyDown={(e) => e.key === 'Escape' && setModalGrafico(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Gráfico ampliado"
+        >
+          <div className="modal-grafico-contenido" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-grafico-cerrar" onClick={() => setModalGrafico(null)} aria-label="Cerrar">
+              ✕
+            </button>
+            {modalGrafico === 'pie' && graficoData && (
+              <div className="modal-grafico-cuerpo">
+                <ErrorBoundary compact message="El gráfico no pudo mostrarse.">
+                  <Pie data={graficoData} options={{ ...graficoOptions, maintainAspectRatio: true, aspectRatio: 1 }} />
+                </ErrorBoundary>
+                <div className="resumen-grafico">
+                  <div><span>Total liquidado:</span> ${totalLiquidado.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  <div><span>Total cobrado:</span> ${totalCobrado.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  <div><span>Total adeudado:</span> ${totalAdeudado.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                </div>
+              </div>
+            )}
+            {modalGrafico === 'barras' && graficoBarrasData && (
+              <div className="modal-grafico-cuerpo modal-grafico-barras">
+                <h3 className="grafico-barras-titulo">Cobrado vs Liquidado por liquidación</h3>
+                <ErrorBoundary compact message="El gráfico no pudo mostrarse.">
+                  <Bar data={graficoBarrasData} options={graficoBarrasOptions} />
+                </ErrorBoundary>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -584,8 +652,130 @@ const getNombreMes = (mesString: string) => {
         <TablaLiquidacionesMensuales
           liquidacionesMensuales={liquidacionesMensualesFiltradas}
           liquidacionesCuotas={cuotasOrdenadas}
+          filtros={
+            <div className="filtros-liquidaciones-bar">
+              {isFilterVisible('categoria') && (
+                <div className="filtro filtro-categorias-checkbox" ref={refFiltroCategorias}>
+                  <label>Categoría(s)</label>
+                  <button
+                    type="button"
+                    className={`selector-categorias-trigger ${filtroCategoriasAbierto ? 'abierto' : ''}`}
+                    onClick={() => setFiltroCategoriasAbierto((a) => !a)}
+                    aria-expanded={filtroCategoriasAbierto}
+                    aria-haspopup="listbox"
+                  >
+                    {filtroCategoriaIds.length === 0
+                      ? 'Todas'
+                      : filtroCategoriaIds.length === 1
+                        ? categorias.find((c) => c.id === filtroCategoriaIds[0])?.nombre ?? '1 categoría'
+                        : `${filtroCategoriaIds.length} categorías`}
+                    <span className="selector-categorias-chevron" aria-hidden>▼</span>
+                  </button>
+                  {filtroCategoriasAbierto && (
+                    <div className="selector-categorias-panel" role="listbox">
+                      <div className="selector-categorias-acciones">
+                        <button type="button" className="selector-categorias-btn-todo" onClick={() => setFiltroCategoriaIds(categorias.map(c => c.id))}>
+                          Seleccionar todo
+                        </button>
+                        <button type="button" className="selector-categorias-btn-todo" onClick={() => setFiltroCategoriaIds([])}>
+                          Deseleccionar todo
+                        </button>
+                      </div>
+                      {categorias.map((cat) => (
+                        <label key={cat.id} className="selector-categorias-opcion">
+                          <input
+                            type="checkbox"
+                            checked={filtroCategoriaIds.includes(cat.id)}
+                            onChange={() => {
+                              const nuevo = filtroCategoriaIds.includes(cat.id)
+                                ? filtroCategoriaIds.filter((x) => x !== cat.id)
+                                : [...filtroCategoriaIds, cat.id];
+                              setFiltroCategoriaIds(nuevo);
+                            }}
+                          />
+                          <span>{cat.nombre}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {isFilterVisible('socio') && (
+                <div className="filtro">
+                  <label htmlFor="liquidaciones-socio-texto">Socio (nombre o número)</label>
+                  <input
+                    id="liquidaciones-socio-texto"
+                    type="text"
+                    placeholder="Nombre o número"
+                    value={filtroSocioTexto}
+                    onChange={(e) => setFiltroSocioTexto(e.target.value)}
+                  />
+                </div>
+              )}
+              {isFilterVisible('año') && (
+                <div className="filtro">
+                  <label htmlFor="liquidaciones-año">Año</label>
+                  <select
+                    id="liquidaciones-año"
+                    value={filtroAño}
+                    onChange={(e) => setFiltroAño(e.target.value)}
+                  >
+                    <option value="">Todos</option>
+                    {añosDisponibles.map((año) => (
+                      <option key={año} value={año}>{año}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {isFilterVisible('fecha') && (
+                <>
+                  <div className="filtro">
+                    <label htmlFor="liquidaciones-desde">Mes desde</label>
+                    <input
+                      id="liquidaciones-desde"
+                      type="month"
+                      value={filtroDesde}
+                      onChange={(e) => setFiltroDesde(e.target.value)}
+                    />
+                  </div>
+                  <div className="filtro">
+                    <label htmlFor="liquidaciones-hasta">Mes hasta</label>
+                    <input
+                      id="liquidaciones-hasta"
+                      type="month"
+                      value={filtroHasta}
+                      onChange={(e) => setFiltroHasta(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+              <button
+                type="button"
+                className="btn-limpiar-filtros"
+                onClick={() => {
+                  setFiltroCategoriaIds([]);
+                  setFiltroSocioTexto('');
+                  setFiltroAño('');
+                  setFiltroDesde('');
+                  setFiltroHasta('');
+                }}
+              >
+                Limpiar filtros
+              </button>
+            </div>
+          }
+          selectorFiltrosVisibles={
+            <SelectorColumnas
+              columnas={LIQUIDACIONES_FILTROS}
+              visibleIds={visibleFilters}
+              onToggle={toggleFilter}
+              onRestaurar={() => setVisibleFilters(LIQUIDACIONES_FILTROS_DEFAULT)}
+              titulo="Filtros visibles"
+              labelBoton="Filtros"
+            />
+          }
           onVerDetalle={handleVerDetalle}
-          onImprimir={handleImprimirMes}
+          onImprimir={handleExportarPdf}
           onBorrar={handleBorrarLiquidacionMensual}
           onEnviarWhatsApp={(mes) => {
             const liquidacionMensual = liquidacionesMensualesFiltradas.find(lm => lm.mes === mes);
@@ -602,14 +792,31 @@ const getNombreMes = (mesString: string) => {
                 + Generar por Socios (Resto del Año)
               </button>
               {cuotasOrdenadas.length > 0 && (
-                <button onClick={() => handleImprimirMes()} className="btn-imprimir">
+                <button onClick={() => handleExportarPdf()} className="btn-imprimir">
                   📄 Exportar PDF
+                </button>
+              )}
+              {cuotasOrdenadas.length > 0 && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const { exportLiquidacionesDobleEntrada } = await import('../utils/exportLiquidacionesExcel');
+                      await exportLiquidacionesDobleEntrada(cuotasOrdenadas);
+                    } catch (error) {
+                      console.error(error);
+                      alert('No se pudo exportar el Excel.');
+                    }
+                  }}
+                  className="btn-imprimir"
+                  title="Excel doble entrada: socios x cuotas, verde=pagado, rojo=pendiente"
+                >
+                  📊 Excel Doble Entrada
                 </button>
               )}
               <button
                 className="btn-grafico"
                 onClick={() => setMostrarGrafico((prev) => !prev)}
-                disabled={!graficoData}
+                disabled={!graficoData && !graficoBarrasData}
               >
                 📊 {mostrarGrafico ? 'Ocultar gráfico' : 'Ver gráfico'}
               </button>

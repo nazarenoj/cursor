@@ -24,11 +24,13 @@ export const ListaBackups = ({ }: ListaBackupsProps) => {
   const [ejecutando, setEjecutando] = useState(false);
   const [restaurando, setRestaurando] = useState<string | null>(null);
   const [eliminando, setEliminando] = useState<string | null>(null);
+  const [descargando, setDescargando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  
+
   const puedeRestaurar = tienePermiso('backup.restaurar');
   const puedeEliminar = tienePermiso('backup.ejecutar');
+  const puedeDescargar = tienePermiso('backup.ver');
 
   useEffect(() => {
     cargarBackups();
@@ -59,12 +61,15 @@ export const ListaBackups = ({ }: ListaBackupsProps) => {
 
       const resultado = await apiService.ejecutarBackup();
       
-      if (resultado.resultado && resultado.resultado.exito) {
+      if (resultado.resultado?.enProceso) {
+        setSuccess('Backup iniciado en segundo plano. Refresque la lista en 1-2 minutos para ver el nuevo backup.');
+        setTimeout(() => cargarBackups(), 30000);
+      } else if (resultado.resultado?.exito) {
         setSuccess(`Backup creado exitosamente: ${resultado.resultado.nombre}`);
         await cargarBackups();
       } else if (resultado.resultado) {
         setError(`Backup completado con errores: ${resultado.resultado.errores?.join(', ') || 'Revisa los detalles'}`);
-        await cargarBackups(); // Recargar para mostrar el backup aunque tenga errores
+        await cargarBackups();
       } else {
         setError('Error desconocido al ejecutar el backup');
       }
@@ -134,6 +139,20 @@ export const ListaBackups = ({ }: ListaBackupsProps) => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al restaurar el backup');
       setRestaurando(null);
+    }
+  };
+
+  const handleDescargar = async (backup: Backup) => {
+    try {
+      setDescargando(backup.nombre);
+      setError(null);
+      setSuccess(null);
+      await apiService.descargarBackup(backup.nombre);
+      setSuccess(`Descarga completada: ${backup.nombre}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al descargar el backup');
+    } finally {
+      setDescargando(null);
     }
   };
 
@@ -253,7 +272,7 @@ export const ListaBackups = ({ }: ListaBackupsProps) => {
                       </span>
                     )}
                     {backup.valido === null && (
-                      <span className="estado-desconocido" title={backup.razonInvalido || 'No se pudo validar el backup. Verifique que WinRAR esté disponible.'}>
+                      <span className="estado-desconocido" title={backup.razonInvalido || 'No se pudo validar el backup (WinRAR para .rar, unzip para .zip en Linux).'}>
                         ❓ {backup.razonInvalido ? 'No validado' : 'Desconocido'}
                       </span>
                     )}
@@ -263,10 +282,30 @@ export const ListaBackups = ({ }: ListaBackupsProps) => {
                   <td>{formatearFecha(backup.fechaModificacion)}</td>
                   <td>
                     <div className="acciones-backup">
+                      {puedeDescargar && (
+                        <button
+                          type="button"
+                          onClick={() => handleDescargar(backup)}
+                          disabled={
+                            restaurando === backup.nombre ||
+                            eliminando === backup.nombre ||
+                            descargando === backup.nombre
+                          }
+                          className="btn-descargar"
+                          title="Descargar copia para copiar a otro equipo o servidor"
+                        >
+                          {descargando === backup.nombre ? '⏳ Descargando...' : '⬇️ Descargar'}
+                        </button>
+                      )}
                       {puedeRestaurar && (
                         <button
                           onClick={() => handleRestaurar(backup)}
-                          disabled={restaurando === backup.nombre || eliminando === backup.nombre || backup.valido === false}
+                          disabled={
+                            restaurando === backup.nombre ||
+                            eliminando === backup.nombre ||
+                            descargando === backup.nombre ||
+                            backup.valido === false
+                          }
                           className="btn-restaurar"
                           title={backup.valido === false ? 'Este backup no es válido y no se puede restaurar' : 'Restaurar este backup'}
                         >
@@ -276,14 +315,18 @@ export const ListaBackups = ({ }: ListaBackupsProps) => {
                       {puedeEliminar && (
                         <button
                           onClick={() => handleEliminar(backup)}
-                          disabled={restaurando === backup.nombre || eliminando === backup.nombre}
+                          disabled={
+                            restaurando === backup.nombre ||
+                            eliminando === backup.nombre ||
+                            descargando === backup.nombre
+                          }
                           className="btn-eliminar"
                           title="Eliminar este backup"
                         >
                           {eliminando === backup.nombre ? '⏳ Eliminando...' : '🗑️ Eliminar'}
                         </button>
                       )}
-                      {!puedeRestaurar && !puedeEliminar && (
+                      {!puedeRestaurar && !puedeEliminar && !puedeDescargar && (
                         <span className="sin-permiso" title="No tiene permisos para realizar acciones">
                           Sin permiso
                         </span>

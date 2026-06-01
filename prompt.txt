@@ -1,5 +1,5 @@
 Regla general para todas las tablas se deben generar funciones para agregar , modificar, borra, listar  con distintos filtros tanto por pantalla como por impresora
-Necesito una aplicacion que me permita, siendo la organizacion un club social y deportivo, llevar una tabla  de socios con los siguintes datos:
+Necesito una aplicacion que me permita, siendo la organizacion un club social, llevar una tabla  de socios con los siguintes datos:
 -Numero de socio
 -Apellido
 -Nombre 

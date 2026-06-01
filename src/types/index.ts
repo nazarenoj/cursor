@@ -2,7 +2,12 @@ export interface ClubConfig {
   nombreClub: string;
   logoUrl: string | null;
   colorPrimario: string;
+  timezone: string;
+  /** true = microservicio Baileys; false = enlaces wa.me */
+  whatsappUsarServicio?: boolean;
   updatedAt?: string;
+  /** Versión de la app expuesta por la API (misma número que el build del frontend cuando está alineado) */
+  appVersion?: string;
 }
 
 export interface Categoria {
@@ -25,6 +30,36 @@ export interface Localidad {
   nombre: string;
   provincia: string;
   codigoPostal: string | null;
+}
+
+/** Estado del microservicio WhatsApp (Baileys), vía proxy autenticado */
+export interface WhatsAppBaileysStatus {
+  connected: boolean;
+  needsQR: boolean;
+  qrBase64?: string;
+  queueLength?: number;
+  /** Versión npm del paquete `server` u otro metadata legacy; no confundir con appVersion */
+  version?: string;
+  /** Versión de la aplicación (REGISTRO_VERSIONES / src/version.ts) */
+  appVersion?: string;
+  serverPackageVersion?: string;
+  reachable?: boolean;
+  serviceError?: string;
+  serviceURL?: string;
+}
+
+export interface WhatsAppBaileysBatchItem {
+  phone: string;
+  caption: string;
+  documentBase64?: string;
+  fileName?: string;
+  mimetype?: string;
+}
+
+export interface WhatsAppBaileysBatchResult {
+  ok: number;
+  total: number;
+  results: { success: boolean; error?: string }[];
 }
 
 export interface WhatsAppTemplate {
@@ -63,7 +98,10 @@ export interface FiltrosSocio {
   apellido?: string;
   nombre?: string;
   dni?: string;
+  /** Una sola categoría (legacy) */
   categoriaId?: number;
+  /** Varias categorías a la vez */
+  categoriaIds?: number[];
   activo?: boolean;
   provincia?: string;
   localidad?: string;
@@ -98,6 +136,7 @@ export interface LiquidacionCuota {
   pagado: boolean;
   fechaPago: string | null;
   medioPago: string | null;
+  numeroRecibo?: number | null;
 }
 
 export interface Usuario {
@@ -170,8 +209,8 @@ export interface Auditoria {
   ruta: string;
   ipAddress: string;
   userAgent: string;
-  datosAnteriores: any;
-  datosNuevos: any;
+  datosAnteriores: unknown;
+  datosNuevos: unknown;
   resultado: 'exitoso' | 'error';
   mensajeError: string | null;
   createdAt: string;

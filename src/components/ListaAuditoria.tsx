@@ -3,6 +3,7 @@ import { apiService } from '../services/api';
 import { useColumnPreferences } from '../hooks/useColumnPreferences';
 import { SelectorColumnas } from './SelectorColumnas';
 import type { Auditoria, AuditoriaFiltros } from '../types';
+import { formatDateTimeES, parseDateTimeToEpochMs } from '../utils/clubDateTime';
 import './ListaAuditoria.css';
 
 const AUDITORIA_COLUMNS = [
@@ -50,7 +51,8 @@ export const ListaAuditoria = () => {
     let comparacion = 0;
     switch (columna) {
       case 'fechaHora':
-        comparacion = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        comparacion =
+          (parseDateTimeToEpochMs(a.createdAt) ?? 0) - (parseDateTimeToEpochMs(b.createdAt) ?? 0);
         break;
       case 'usuario':
         comparacion = (a.usuarioNombre || '').localeCompare(b.usuarioNombre || '');
@@ -101,7 +103,7 @@ export const ListaAuditoria = () => {
     }
   };
 
-  const handleFiltroChange = (key: keyof AuditoriaFiltros, value: any) => {
+  const handleFiltroChange = (key: keyof AuditoriaFiltros, value: string | number | boolean | undefined) => {
     setFiltros((prev) => ({
       ...prev,
       [key]: value === '' ? undefined : value,
@@ -119,8 +121,7 @@ export const ListaAuditoria = () => {
   };
 
   const handleEliminarFiltrados = async () => {
-    // Construir filtros para eliminar (sin paginación)
-    const filtrosEliminar: any = {};
+    const filtrosEliminar: Record<string, string | number> = {};
     if (filtros.usuario_id) filtrosEliminar.usuario_id = filtros.usuario_id;
     if (filtros.modulo) filtrosEliminar.modulo = filtros.modulo;
     if (filtros.accion) filtrosEliminar.accion = filtros.accion;
@@ -128,24 +129,55 @@ export const ListaAuditoria = () => {
     if (filtros.fecha_hasta) filtrosEliminar.fecha_hasta = filtros.fecha_hasta;
     if (filtros.resultado) filtrosEliminar.resultado = filtros.resultado;
 
-    // Verificar que haya al menos un filtro
-    if (Object.keys(filtrosEliminar).length === 0) {
-      alert('Debe especificar al menos un filtro para eliminar registros');
-      return;
-    }
+    const tieneFiltros = Object.keys(filtrosEliminar).length > 0;
+    const mensajeConfirmacion = tieneFiltros
+      ? `Se descargará un archivo Excel con los registros antes de eliminarlos.\n\n` +
+        `¿Continuar? Se eliminarán los registros que coincidan con los filtros actuales (aprox. ${paginacion.total} registro(s)).`
+      : `Se descargará un archivo Excel con TODOS los registros antes de eliminarlos.\n\n` +
+        `¿Continuar? Se eliminará TODA la auditoría (aprox. ${paginacion.total} registro(s)).`;
 
-    const confirmar = window.confirm(
-      `¿Está seguro que desea eliminar los registros de auditoría que coincidan con los filtros actuales?\n\n` +
-      `Esto eliminará ${paginacion.total} registro(s) y no se puede deshacer.`
-    );
-
-    if (!confirmar) return;
+    if (!window.confirm(mensajeConfirmacion)) return;
 
     setEliminando(true);
     try {
+      const { registros } = await apiService.getAuditoriaExportar(filtrosEliminar);
+      if (registros.length > 0) {
+        const visibleExport = visible.filter((id) => id !== 'acciones');
+        const columnMap: Record<string, (r: Auditoria) => string | number> = {
+          fechaHora: (r) => (r.createdAt ? formatDateTimeES(r.createdAt) : ''),
+          usuario: (r) => r.usuarioNombre || '',
+          modulo: (r) => r.modulo || '',
+          accion: (r) => r.accion || '',
+          descripcion: (r) => r.descripcion || '',
+          ip: (r) => r.ipAddress || '',
+          resultado: (r) => r.resultado || '',
+          detalles: (r) => r.ruta || '',
+        };
+        const headers: Record<string, string> = {
+          fechaHora: 'Fecha',
+          usuario: 'Usuario',
+          modulo: 'Módulo',
+          accion: 'Acción',
+          descripcion: 'Descripción',
+          ip: 'IP',
+          resultado: 'Resultado',
+          detalles: 'Ruta',
+        };
+        const ids = visibleExport.length > 0 ? visibleExport : AUDITORIA_COLUMNS.map((c) => c.id);
+        const data = registros.map((r) => {
+          const row: Record<string, string | number> = {};
+          ids.forEach((id) => {
+            if (columnMap[id] && headers[id]) row[headers[id]] = columnMap[id](r);
+          });
+          return row;
+        });
+        if (data.length > 0 && Object.keys(data[0]).length > 0) {
+          const { exportToExcel } = await import('../utils/exportExcel');
+          exportToExcel(data, `Auditoria-backup-${new Date().toISOString().slice(0, 10)}`, 'Auditoría');
+        }
+      }
       const resultado = await apiService.eliminarAuditoria(filtrosEliminar);
       alert(resultado.message);
-      // Recargar datos
       await loadData();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error al eliminar registros');
@@ -155,14 +187,7 @@ export const ListaAuditoria = () => {
   };
 
   const formatearFecha = (fecha: string) => {
-    return new Date(fecha).toLocaleString('es-AR', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
+    return formatDateTimeES(fecha);
   };
 
   if (loading) {
@@ -180,16 +205,18 @@ export const ListaAuditoria = () => {
           >
             {mostrarFiltros ? 'Ocultar Filtros' : 'Mostrar Filtros'}
           </button>
-          {(filtros.usuario_id || filtros.modulo || filtros.accion || filtros.fecha_desde || filtros.fecha_hasta || filtros.resultado) && (
-            <button
-              onClick={handleEliminarFiltrados}
-              className="btn-eliminar"
-              disabled={eliminando}
-              title="Eliminar registros que coincidan con los filtros actuales"
-            >
-              {eliminando ? 'Eliminando...' : '🗑️ Eliminar Filtrados'}
-            </button>
-          )}
+          <button
+            onClick={handleEliminarFiltrados}
+            className="btn-eliminar"
+            disabled={eliminando}
+            title={
+              filtros.usuario_id || filtros.modulo || filtros.accion || filtros.fecha_desde || filtros.fecha_hasta || filtros.resultado
+                ? 'Eliminar registros que coincidan con los filtros actuales'
+                : 'Eliminar TODA la auditoría (se descargará Excel antes)'
+            }
+          >
+            {eliminando ? 'Eliminando...' : '🗑️ Eliminar Filtrados'}
+          </button>
         </div>
       </div>
 
@@ -290,7 +317,7 @@ export const ListaAuditoria = () => {
         </p>
       </div>
 
-      <div className="tabla-wrapper">
+      <div className="tabla-auditoria-container">
         <div className="tabla-acciones-superior">
           <SelectorColumnas
             columnas={AUDITORIA_COLUMNS}
@@ -300,7 +327,8 @@ export const ListaAuditoria = () => {
             titulo="Columnas visibles"
           />
         </div>
-        <table className="tabla-auditoria">
+        <div className="tabla-wrapper">
+          <table className="tabla-auditoria">
           <thead>
             <tr>
               {isVisible('fechaHora') && (
@@ -432,6 +460,7 @@ export const ListaAuditoria = () => {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {paginacion.totalPaginas > 1 && (
@@ -487,7 +516,7 @@ const ModalDetalle = ({ registro, onClose }: ModalDetalleProps) => {
             <strong>ID:</strong> {registro.id}
           </div>
           <div className="detalle-item">
-            <strong>Fecha/Hora:</strong> {new Date(registro.createdAt).toLocaleString('es-AR')}
+            <strong>Fecha/Hora:</strong> {formatDateTimeES(registro.createdAt)}
           </div>
           <div className="detalle-item">
             <strong>Usuario:</strong> {registro.usuarioNombre} {registro.usuarioId && `(ID: ${registro.usuarioId})`}
@@ -528,13 +557,13 @@ const ModalDetalle = ({ registro, onClose }: ModalDetalleProps) => {
               <strong>Error:</strong> {registro.mensajeError}
             </div>
           )}
-          {registro.datosAnteriores && (
+          {registro.datosAnteriores != null && (
             <div className="detalle-item">
               <strong>Datos Anteriores:</strong>
               <pre>{JSON.stringify(registro.datosAnteriores, null, 2)}</pre>
             </div>
           )}
-          {registro.datosNuevos && (
+          {registro.datosNuevos != null && (
             <div className="detalle-item">
               <strong>Datos Nuevos:</strong>
               <pre>{JSON.stringify(registro.datosNuevos, null, 2)}</pre>

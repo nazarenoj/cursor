@@ -132,16 +132,19 @@ export const useLiquidaciones = () => {
     ids: number[],
     medioPago: string,
     fechaPago?: string,
-  ): Promise<LiquidacionCuota[]> => {
+  ): Promise<LiquidacionCuota[] & { numeroRecibo?: number }> => {
     if (ids.length === 0) return [];
     const respuesta = await apiService.pagarCuotas(ids, medioPago, fechaPago);
-    // La respuesta puede ser un array o un objeto con propiedad cuotas
+    // La respuesta es un objeto { cuotas, numeroRecibo, ... } o array (compatibilidad)
     let actualizadas: LiquidacionCuota[];
+    let numeroRecibo: number | undefined;
     if (Array.isArray(respuesta)) {
       actualizadas = respuesta;
+      numeroRecibo = (respuesta as LiquidacionCuota[] & { numeroRecibo?: number }).numeroRecibo;
     } else if (respuesta && typeof respuesta === 'object' && 'cuotas' in respuesta) {
-      const respuestaConCuotas = respuesta as { cuotas: LiquidacionCuota[] };
-      actualizadas = Array.isArray(respuestaConCuotas.cuotas) ? respuestaConCuotas.cuotas : [];
+      const resp = respuesta as { cuotas: LiquidacionCuota[]; numeroRecibo?: number };
+      actualizadas = Array.isArray(resp.cuotas) ? resp.cuotas : [];
+      numeroRecibo = resp.numeroRecibo;
     } else {
       actualizadas = [];
     }
@@ -149,7 +152,9 @@ export const useLiquidaciones = () => {
     setLiquidacionesCuotas((prev) =>
       prev.map((cuota) => (mapa.has(cuota.id) ? mapa.get(cuota.id)! : cuota)),
     );
-    return actualizadas;
+    const resultado = actualizadas as LiquidacionCuota[] & { numeroRecibo?: number };
+    resultado.numeroRecibo = numeroRecibo;
+    return resultado;
   };
 
   const borrarLiquidacionMensual = async (id: number): Promise<void> => {

@@ -1,12 +1,9 @@
 import { format } from 'date-fns';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { useClubConfig } from '../contexts/ClubConfigContext';
-import { dibujarEncabezadoConLogo } from '../utils/pdfLogo';
 import { apiService } from '../services/api';
 import { useColumnPreferences } from '../hooks/useColumnPreferences';
-import { exportarSociosExcel } from '../utils/exportSociosPdf';
 import type { Socio, Categoria, FiltrosSocio } from '../types';
+import { formatDateOnlyES } from '../utils/clubDateTime';
 import './ImprimirSocios.css';
 
 const SOCIOS_DEFAULT_VISIBLE = ['numeroSocio', 'apellido', 'nombre', 'dni', 'telefono', 'email', 'categoria', 'estado', 'acciones'];
@@ -27,112 +24,27 @@ export const ImprimirSocios = ({ socios, categorias, filtros, onVolver }: Imprim
   };
 
   const formatFecha = (fecha: string | null) => {
-    if (!fecha) return '-';
-    try {
-      return format(new Date(fecha), 'dd/MM/yyyy');
-    } catch {
-      return fecha;
-    }
+    return formatDateOnlyES(fecha);
   };
 
   const handleExportarPdf = async () => {
-    // Registrar exportación en auditoría
-    try {
-      await apiService.registrarExportacion('socios', 'PDF', filtros);
-    } catch (err) {
-      // No bloquear la exportación si falla el registro
-      console.warn('No se pudo registrar la exportación en auditoría:', err);
-    }
-    
-    const doc = new jsPDF({ orientation: 'landscape' });
-    const fecha = new Date().toLocaleString('es-AR');
-
-    // Encabezado con logo
-    dibujarEncabezadoConLogo(doc, 'landscape', nombreClub);
-
-    // Información del documento
-    doc.setTextColor(45, 55, 72);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(11);
-    doc.text(`Fecha de generación: ${fecha}`, 14, 38);
-    doc.text(`Filtros aplicados: ${getFiltrosTexto()}`, 14, 45);
-    doc.text(`Total de socios: ${socios.length}`, 14, 52);
-
-    // Tabla
-    autoTable(doc, {
-      startY: 60,
-      headStyles: {
-        fillColor: [102, 126, 234],
-        textColor: 255,
-        fontSize: 9,
-      },
-      bodyStyles: {
-        textColor: 45,
-        fontSize: 8,
-      },
-      head: [[
-        'N° Socio',
-        'Apellido',
-        'Nombre',
-        'DNI',
-        'Fecha Nac.',
-        'Dirección',
-        'Localidad',
-        'Provincia',
-        'Teléfono',
-        'Email',
-        'Categoría',
-        'Obra Social',
-        'N° Afiliado',
-        'Fecha Alta',
-        'Fecha Baja',
-        'Estado',
-      ]],
-      body: socios.map((socio) => [
-        socio.numeroSocio.toString(),
-        socio.apellido,
-        socio.nombre,
-        socio.dni ?? '-',
-        formatFecha(socio.fechaNacimiento ?? ''),
-        [socio.calle, socio.numeroCasa].filter(Boolean).join(' ').trim() || '-',
-        socio.localidad ?? '-',
-        socio.provincia ?? '-',
-        socio.telefono || '-',
-        socio.email || '-',
-        getCategoriaNombre(socio.categoriaId),
-        socio.obraSocial || '-',
-        socio.numeroAfiliado || '-',
-        formatFecha(socio.fechaAlta),
-        formatFecha(socio.fechaBaja),
-        socio.fechaBaja ? 'Inactivo' : 'Activo',
-      ]),
-      didDrawPage: (data) => {
-        if (data.pageNumber > 1) {
-          dibujarEncabezadoConLogo(doc, 'landscape', nombreClub);
-        }
-        const pageCount = doc.getNumberOfPages();
-        const pageSize = doc.internal.pageSize;
-        doc.setFontSize(9);
-        doc.setTextColor(150);
-        doc.text(
-          `Página ${data.pageNumber} de ${pageCount}`,
-          pageSize.width - 20,
-          pageSize.height - 10,
-          { align: 'right' },
-        );
-      },
-    });
-
-    doc.save(`Listado-Socios-${Date.now()}.pdf`);
+    const visibleIds = visibleColumns.filter((id) => id !== 'acciones');
+    const { exportarSociosPdf } = await import('../utils/exportSociosPdf');
+    await exportarSociosPdf(socios, categorias, nombreClub, visibleIds.length ? visibleIds : undefined);
   };
 
   const handleExportarExcel = async () => {
     try {
-      await apiService.registrarExportacion('socios', 'Excel', filtros);
+      await apiService.registrarExportacion(
+        'socios',
+        'Excel',
+        filtros as unknown as Record<string, unknown>,
+      );
     } catch (err) {
       console.warn('No se pudo registrar la exportación en auditoría:', err);
     }
     const visibleIds = visibleColumns.filter((id) => id !== 'acciones');
+    const { exportarSociosExcel } = await import('../utils/exportSociosPdf');
     exportarSociosExcel(socios, categorias, visibleIds.length ? visibleIds : undefined);
   };
 

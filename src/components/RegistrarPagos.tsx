@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import jsPDF from 'jspdf';
 import { useClubConfig } from '../contexts/ClubConfigContext';
 import { useLiquidaciones } from '../hooks/useLiquidaciones';
 import { useCategorias } from '../hooks/useCategorias';
-import { dibujarEncabezadoConLogo } from '../utils/pdfLogo';
 import { apiService } from '../services/api';
+import { getNombreMesRecibo } from '../utils/formatRecibo';
 import type { MedioPagoDB, Socio } from '../types';
 import './RegistrarPagos.css';
 
@@ -56,7 +55,7 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
   };
 
   const cuotasPendientes = useMemo(() => {
-    return liquidacionesCuotas
+    const resultado = liquidacionesCuotas
       .filter((cuota) => !cuota.pagado && (!socio || cuota.socioId === socio.id))
       .map((cuota) => {
         const liquidacionMensual = liquidacionesMensuales.find(
@@ -69,6 +68,7 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
         };
       })
       .sort((a, b) => b.mes.localeCompare(a.mes));
+    return resultado;
   }, [liquidacionesCuotas, liquidacionesMensuales, socio]);
 
   const totalSeleccionado = useMemo(() => {
@@ -246,8 +246,11 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
       .map((item) => `${item.medio}: $${item.monto.toFixed(2)}`)
       .join(', ');
 
+    const fechaHoy = new Date();
+    const fechaPagoISO = `${fechaHoy.getFullYear()}-${String(fechaHoy.getMonth() + 1).padStart(2, '0')}-${String(fechaHoy.getDate()).padStart(2, '0')}`;
+
     try {
-      const cuotasActualizadas = await marcarCuotasComoPagadas(ids, descripcionMedios);
+      const cuotasActualizadas = await marcarCuotasComoPagadas(ids, descripcionMedios, fechaPagoISO);
 
       if (cuotasActualizadas.length === 0) {
         setAlerta({
@@ -256,6 +259,10 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
         });
         return;
       }
+
+      const numeroRecibo =
+        (cuotasActualizadas as { numeroRecibo?: number }).numeroRecibo ??
+        cuotasActualizadas[0]?.numeroRecibo;
 
       if (socio) {
         // Registrar generación de recibo en auditoría
@@ -266,17 +273,22 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
             numeroSocio: socio.numeroSocio,
             total: totalSeleccionado,
             cuotas: ids.length,
+            numeroRecibo,
           });
         } catch (err) {
           console.warn('No se pudo registrar la generación de recibo en auditoría:', err);
         }
 
+        const { generarRecibo } = await import('../utils/reciboPdf');
         const reciboGenerado = generarRecibo({
-          socio,
-          medios: descripcionMedios,
-          cuotas: cuotasPendientes.filter((cuota) => ids.includes(cuota.id)),
+          socio: { numeroSocio: socio.numeroSocio, apellido: socio.apellido, nombre: socio.nombre },
+          mediosDetalle: mediosSeleccionados.map((item) => ({ medio: item.medio, monto: item.monto })),
+          cuotas: cuotasPendientes
+            .filter((cuota) => ids.includes(cuota.id))
+            .map((c) => ({ mes: c.mes, fechaLiquidacion: c.fechaLiquidacion, monto: c.monto })),
           total: totalSeleccionado,
           nombreClub,
+          numeroRecibo: numeroRecibo ?? undefined,
         });
         if (reciboGenerado) {
           setUltimoRecibo({
@@ -391,7 +403,7 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
                               onChange={() => toggleSeleccion(cuota.id)}
                             />
                           </td>
-                          <td>{getNombreMes(cuota.mes)}</td>
+                          <td>{getNombreMesRecibo(cuota.mes)}</td>
                           <td>{cuota.fechaLiquidacion || '-'}</td>
                           <td>${cuota.monto.toFixed(2)}</td>
                           <td>
@@ -500,88 +512,5 @@ export const RegistrarPagos = ({ socio }: RegistrarPagosProps) => {
     </div>
   );
 };
-
-const getNombreMes = (mesString: string) => {
-  if (!mesString) return '-';
-  const [año, mes] = mesString.split('-');
-  const fecha = new Date(parseInt(año), parseInt(mes) - 1, 1);
-  return fecha.toLocaleString('es-AR', { month: 'long', year: 'numeric' });
-};
-
-interface GenerarReciboParams {
-  socio: Socio;
-  medios: string;
-  cuotas: Array<{
-    mes: string;
-    fechaLiquidacion: string;
-    monto: number;
-  }>;
-  total: number;
-  nombreClub: string;
-}
-
-const generarRecibo = ({ socio, medios, cuotas, total, nombreClub }: GenerarReciboParams) => {
-  const doc = new jsPDF();
-  const fechaHoy = new Date().toLocaleString('es-AR');
-
-  dibujarEncabezadoConLogo(doc, 'portrait', nombreClub);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-
-  doc.text(`Fecha de emisión: ${fechaHoy}`, 20, 55);
-  doc.text(`Socio: ${socio.apellido}, ${socio.nombre}`, 20, 63);
-  doc.text(`Número de socio: ${socio.numeroSocio}`, 20, 71);
-
-  doc.setFont('helvetica', 'bold');
-      doc.text('Medios de cobro:', 20, 83);
-  doc.setFont('helvetica', 'normal');
-  doc.text(medios, 20, 90, { maxWidth: 170 });
-
-  let y = 106;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Detalle de cuotas canceladas', 20, y);
-  y += 6;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFillColor(245, 247, 250);
-  doc.roundedRect(20, y, 170, 10, 3, 3, 'F');
-  doc.setFontSize(10);
-  doc.text('Mes', 27, y + 7);
-  doc.text('Fecha liquidación', 72, y + 7);
-  doc.text('Monto', 150, y + 7, { align: 'right' });
-  y += 14;
-
-  doc.setFontSize(10);
-  cuotas.forEach((cuota) => {
-    doc.text(getNombreMes(cuota.mes), 27, y);
-    doc.text(cuota.fechaLiquidacion || '-', 95, y, { align: 'center' });
-    doc.text(`$${cuota.monto.toFixed(2)}`, 150, y, { align: 'right' });
-    y += 7;
-    if (y > 260) {
-      doc.addPage();
-      dibujarEncabezadoConLogo(doc, 'portrait', nombreClub);
-      y = 106;
-    }
-  });
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text(`Total abonado: $${total.toFixed(2)}`, 150, y + 6, { align: 'right' });
-
-  doc.setDrawColor(200);
-  doc.line(20, y + 20, 190, y + 20);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.text('Firma y sello', 150, y + 26, { align: 'center' });
-
-  const filename = `Recibo-${socio.numeroSocio}-${Date.now()}.pdf`;
-  doc.save(filename);
-
-  const blobUrl = doc.output('bloburl') as string | URL;
-  const urlString = typeof blobUrl === 'string' ? blobUrl : blobUrl.toString();
-  return { url: urlString, nombre: filename };
-};
-
 
 

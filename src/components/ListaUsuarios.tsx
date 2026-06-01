@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { apiService } from '../services/api';
 import { useColumnPreferences } from '../hooks/useColumnPreferences';
 import { SelectorColumnas } from './SelectorColumnas';
 import type { Usuario, Permiso } from '../types';
 import './ListaUsuarios.css';
+
+type FiltrosUsuarios = { usuario: string; estado: '' | 'activo' | 'inactivo' };
 
 const USUARIOS_COLUMNS = [
   { id: 'id', label: 'ID' },
@@ -28,6 +30,16 @@ export const ListaUsuarios = () => {
   );
   const visible = loadingCols ? USUARIOS_DEFAULT_VISIBLE : visibleColumns;
   const isVisible = (id: string) => visible.includes(id);
+  const [filtros, setFiltros] = useState<FiltrosUsuarios>({ usuario: '', estado: '' });
+
+  const usuariosFiltrados = useMemo(() => {
+    return usuarios.filter((u) => {
+      if (filtros.usuario && !u.usuario.toLowerCase().includes(filtros.usuario.toLowerCase())) return false;
+      if (filtros.estado === 'activo' && !u.activo) return false;
+      if (filtros.estado === 'inactivo' && u.activo) return false;
+      return true;
+    });
+  }, [usuarios, filtros]);
 
   useEffect(() => {
     loadUsuarios();
@@ -116,7 +128,7 @@ export const ListaUsuarios = () => {
     }
   };
 
-  const usuariosOrdenados = [...usuarios].sort((a, b) => {
+  const usuariosOrdenados = [...usuariosFiltrados].sort((a, b) => {
     if (!ordenColumna) return 0;
     const { columna, direccion } = ordenColumna;
     let comparacion = 0;
@@ -162,11 +174,41 @@ export const ListaUsuarios = () => {
         </div>
       </div>
 
-      <div className="lista-info">
-        <p>Total de usuarios: {usuarios.length}</p>
+      <div className="filtros-usuarios">
+        <div className="filtro-group">
+          <label htmlFor="filtro-usuario">Usuario:</label>
+          <input
+            type="text"
+            id="filtro-usuario"
+            placeholder="Buscar por usuario"
+            value={filtros.usuario}
+            onChange={(e) => setFiltros((p) => ({ ...p, usuario: e.target.value }))}
+          />
+        </div>
+        <div className="filtro-group">
+          <label htmlFor="filtro-estado-usu">Estado:</label>
+          <select
+            id="filtro-estado-usu"
+            value={filtros.estado}
+            onChange={(e) => setFiltros((p) => ({ ...p, estado: e.target.value as FiltrosUsuarios['estado'] }))}
+          >
+            <option value="">Todos</option>
+            <option value="activo">Activo</option>
+            <option value="inactivo">Inactivo</option>
+          </select>
+        </div>
+        <div className="filtro-acciones">
+          <button type="button" className="btn-limpiar" onClick={() => setFiltros({ usuario: '', estado: '' })}>
+            Limpiar filtros
+          </button>
+        </div>
       </div>
 
-      <div className="tabla-wrapper">
+      <div className="lista-info">
+        <p>Total de usuarios: {usuariosFiltrados.length}</p>
+      </div>
+
+      <div className="tabla-usuarios-container">
         <div className="tabla-acciones-superior">
           <SelectorColumnas
             columnas={USUARIOS_COLUMNS}
@@ -176,7 +218,8 @@ export const ListaUsuarios = () => {
             titulo="Columnas visibles"
           />
         </div>
-        <table className="tabla-usuarios">
+        <div className="tabla-wrapper">
+          <table className="tabla-usuarios">
           <thead>
             <tr>
               {isVisible('id') && (
@@ -225,10 +268,10 @@ export const ListaUsuarios = () => {
             </tr>
           </thead>
           <tbody>
-            {usuarios.length === 0 ? (
+            {usuariosOrdenados.length === 0 ? (
               <tr>
                 <td colSpan={visible.length || 4} className="sin-datos">
-                  No hay usuarios registrados.
+                  {usuarios.length === 0 ? 'No hay usuarios registrados.' : 'No hay usuarios que coincidan con los filtros.'}
                 </td>
               </tr>
             ) : (
@@ -284,6 +327,7 @@ export const ListaUsuarios = () => {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {usuarioPermisos && (

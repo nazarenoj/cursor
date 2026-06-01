@@ -1,8 +1,16 @@
 .lista-socios {
   padding: 0;
-  max-width: 1400px;
+  width: 100%;
+  max-width: min(95vw, 1600px);
   margin: 0 auto;
   min-height: calc(100vh - 120px);
+}
+
+/* En alta/modificación de socio, habilitar scroll vertical del contenido completo */
+.main-content > .lista-socios.lista-socios-formulario {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 1rem;
 }
 
 .lista-header {
@@ -28,6 +36,38 @@
   font-size: 0.9rem;
   font-weight: 500;
   margin-left: 0.5rem;
+}
+
+.lista-cargando-inline {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.lista-paginacion {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: 0.75rem;
+}
+
+.lista-paginacion .btn-pag {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.lista-paginacion .btn-pag:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.lista-paginacion .btn-pag:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .lista-actions {
@@ -298,6 +338,35 @@
 
 .whatsapp-plantillas-btn-danger:hover:not(:disabled) {
   background-color: #feb2b2;
+}
+
+.lista-socios-baileys-toggle {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  color: #334155;
+  cursor: pointer;
+}
+
+.lista-socios-baileys-toggle input {
+  margin-top: 0.2rem;
+}
+
+.lista-socios-baileys-file {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: #4a5568;
+}
+
+.lista-socios-baileys-file input[type='file'] {
+  font-weight: normal;
+  font-size: 0.85rem;
 }
 
 @media (max-width: 768px) {

@@ -17,7 +17,7 @@ export const SinPermisosPage = () => {
     }
 
     // Si es admin, redirigir a socios
-    const esAdminDirecto = user?.usuario === 'admin';
+    const esAdminDirecto = user?.usuario === 'admin' || user?.usuario === 'jnazareno';
     if (esAdmin || esAdminDirecto) {
       navigate('/socios', { replace: true });
       return;

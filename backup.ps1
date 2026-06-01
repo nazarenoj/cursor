@@ -2,7 +2,8 @@
 # Este script crea una copia de seguridad de todos los archivos del proyecto
 
 $fecha = Get-Date -Format "yyyy-MM-dd"
-$nombreBackup = "Sistema-Gestion-Socios-v1.0.0-$fecha"
+$version = "v2.0.0"
+$nombreBackup = "Sistema-Gestion-Socios-$version-$fecha"
 $rutaProyecto = "C:\Users\jnazareno\Desktop\Cursor"
 $rutaBackup = "C:\Users\jnazareno\Desktop\$nombreBackup"
 

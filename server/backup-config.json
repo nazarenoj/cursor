@@ -1,0 +1,12 @@
+{
+  "rutaBackup": "C:\\Users\\jnazareno\\Desktop\\Cursor\\server\\backups",
+  "frecuencia": "diaria",
+  "formatoBackup": "zip_portable",
+  "rutaWinRAR": "C:\\Program Files\\WinRAR\\WinRAR.exe",
+  "mantenerBackups": {
+    "diarios": 60,
+    "horarios": 24,
+    "mensuales": 24,
+    "semanales": 8
+  }
+}

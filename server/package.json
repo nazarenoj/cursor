@@ -1,24 +1,37 @@
 {
   "name": "server",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "npx nodemon --watch src --ext js,mjs,cjs,json --ignore backups/** --ignore logs/** src/index.js",
+    "vaciar-liquidaciones": "node scripts/vaciar-liquidaciones-y-pagos.js",
+    "test": "node --test tests/**/*.test.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "archiver": "^7.0.1",
+    "@whiskeysockets/baileys": "^6.7.9",
     "bcryptjs": "^3.0.3",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.1",
-    "mysql2": "^3.15.3"
+    "multer": "^2.0.0",
+    "mysql2": "^3.15.3",
+    "pino": "^8.16.2",
+    "qrcode": "^1.5.3",
+    "node-cache": "^5.1.2",
+    "node-cron": "^3.0.3",
+    "unzipper": "^0.12.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"

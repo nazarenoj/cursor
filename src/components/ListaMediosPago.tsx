@@ -1,7 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { apiService } from '../services/api';
+import { useColumnPreferences } from '../hooks/useColumnPreferences';
+import { SelectorColumnas } from './SelectorColumnas';
 import type { MedioPagoDB, Caja } from '../types';
 import './ListaMediosPago.css';
+
+const MEDIOS_PAGO_COLUMNS = [
+  { id: 'id', label: 'ID' },
+  { id: 'nombre', label: 'Nombre' },
+  { id: 'descripcion', label: 'Descripción' },
+  { id: 'caja', label: 'Caja Asociada' },
+  { id: 'tipoMovimiento', label: 'Tipo Movimiento' },
+  { id: 'estado', label: 'Estado' },
+];
+const MEDIOS_PAGO_DEFAULT_VISIBLE = MEDIOS_PAGO_COLUMNS.map((c) => c.id);
+
+type FiltrosMediosPago = {
+  nombre: string;
+  tipoMovimiento: '' | 'ingreso' | 'egreso' | 'ambos';
+  estado: '' | 'activo' | 'inactivo';
+};
 
 export const ListaMediosPago = () => {
   const [mediosPago, setMediosPago] = useState<MedioPagoDB[]>([]);
@@ -11,6 +29,24 @@ export const ListaMediosPago = () => {
   const [medioEditando, setMedioEditando] = useState<MedioPagoDB | undefined>(undefined);
   const [error, setError] = useState('');
   const [ordenColumna, setOrdenColumna] = useState<{ columna: string; direccion: 'asc' | 'desc' } | null>(null);
+  const [filtros, setFiltros] = useState<FiltrosMediosPago>({ nombre: '', tipoMovimiento: '', estado: '' });
+
+  const { visibleColumns, setVisibleColumns, toggleColumn, loading: loadingCols } = useColumnPreferences(
+    'medios-pago',
+    MEDIOS_PAGO_DEFAULT_VISIBLE,
+  );
+  const visible = loadingCols ? MEDIOS_PAGO_DEFAULT_VISIBLE : visibleColumns;
+  const isVisible = (id: string) => visible.includes(id);
+
+  const mediosFiltrados = useMemo(() => {
+    return mediosPago.filter((m) => {
+      if (filtros.nombre && !m.nombre.toLowerCase().includes(filtros.nombre.toLowerCase())) return false;
+      if (filtros.tipoMovimiento && m.tipoMovimiento !== filtros.tipoMovimiento) return false;
+      if (filtros.estado === 'activo' && !m.activo) return false;
+      if (filtros.estado === 'inactivo' && m.activo) return false;
+      return true;
+    });
+  }, [mediosPago, filtros]);
 
   const handleOrdenar = (columna: string) => {
     if (ordenColumna && ordenColumna.columna === columna) {
@@ -20,7 +56,7 @@ export const ListaMediosPago = () => {
     }
   };
 
-  const mediosOrdenados = [...mediosPago].sort((a, b) => {
+  const mediosOrdenados = [...mediosFiltrados].sort((a, b) => {
     if (!ordenColumna) return 0;
     const { columna, direccion } = ordenColumna;
     let comparacion = 0;
@@ -152,115 +188,159 @@ export const ListaMediosPago = () => {
 
       {error && <div className="error-message">{error}</div>}
 
-      <div className="lista-info">
-        <p>Total de medios de pago: {mediosPago.length}</p>
+      <div className="filtros-medios-pago">
+        <div className="filtro-group">
+          <label htmlFor="filtro-nombre-mp">Nombre:</label>
+          <input
+            type="text"
+            id="filtro-nombre-mp"
+            placeholder="Buscar por nombre"
+            value={filtros.nombre}
+            onChange={(e) => setFiltros((p) => ({ ...p, nombre: e.target.value }))}
+          />
+        </div>
+        <div className="filtro-group">
+          <label htmlFor="filtro-tipo-mp">Tipo:</label>
+          <select
+            id="filtro-tipo-mp"
+            value={filtros.tipoMovimiento}
+            onChange={(e) => setFiltros((p) => ({ ...p, tipoMovimiento: e.target.value as FiltrosMediosPago['tipoMovimiento'] }))}
+          >
+            <option value="">Todos</option>
+            <option value="ingreso">Ingreso</option>
+            <option value="egreso">Egreso</option>
+            <option value="ambos">Ambos</option>
+          </select>
+        </div>
+        <div className="filtro-group">
+          <label htmlFor="filtro-estado-mp">Estado:</label>
+          <select
+            id="filtro-estado-mp"
+            value={filtros.estado}
+            onChange={(e) => setFiltros((p) => ({ ...p, estado: e.target.value as FiltrosMediosPago['estado'] }))}
+          >
+            <option value="">Todos</option>
+            <option value="activo">Activo</option>
+            <option value="inactivo">Inactivo</option>
+          </select>
+        </div>
+        <div className="filtro-acciones">
+          <button type="button" className="btn-limpiar" onClick={() => setFiltros({ nombre: '', tipoMovimiento: '', estado: '' })}>
+            Limpiar filtros
+          </button>
+        </div>
       </div>
 
-      <div className="tabla-wrapper">
-        <table className="tabla-medios-pago">
-          <thead>
-            <tr>
-              <th
-                className="sortable"
-                onClick={() => handleOrdenar('id')}
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-              >
-                ID
-                {ordenColumna?.columna === 'id' && (
-                  <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
-                )}
-              </th>
-              <th
-                className="sortable"
-                onClick={() => handleOrdenar('nombre')}
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-              >
-                Nombre
-                {ordenColumna?.columna === 'nombre' && (
-                  <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
-                )}
-              </th>
-              <th
-                className="sortable"
-                onClick={() => handleOrdenar('descripcion')}
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-              >
-                Descripción
-                {ordenColumna?.columna === 'descripcion' && (
-                  <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
-                )}
-              </th>
-              <th
-                className="sortable"
-                onClick={() => handleOrdenar('caja')}
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-              >
-                Caja Asociada
-                {ordenColumna?.columna === 'caja' && (
-                  <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
-                )}
-              </th>
-              <th
-                className="sortable"
-                onClick={() => handleOrdenar('tipoMovimiento')}
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-              >
-                Tipo Movimiento
-                {ordenColumna?.columna === 'tipoMovimiento' && (
-                  <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
-                )}
-              </th>
-              <th
-                className="sortable"
-                onClick={() => handleOrdenar('estado')}
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-              >
-                Estado
-                {ordenColumna?.columna === 'estado' && (
-                  <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
-                )}
-              </th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {mediosPago.length === 0 ? (
+      <div className="lista-info tabla-acciones-medios">
+        <p>Total de medios de pago: {mediosFiltrados.length}</p>
+        <SelectorColumnas
+          columnas={MEDIOS_PAGO_COLUMNS}
+          visibleIds={visible}
+          onToggle={toggleColumn}
+          onRestaurar={() => setVisibleColumns(MEDIOS_PAGO_DEFAULT_VISIBLE)}
+        />
+      </div>
+
+      <div className="tabla-medios-pago-container">
+        <div className="tabla-wrapper">
+          <table className="tabla-medios-pago">
+            <thead>
               <tr>
-                <td colSpan={7} className="sin-datos">
-                  No hay medios de pago registrados.
-                </td>
-              </tr>
-            ) : (
-              mediosOrdenados.map((medio) => (
-                <tr key={medio.id}>
-                  <td>{medio.id}</td>
-                  <td>{medio.nombre}</td>
-                  <td>{medio.descripcion || '-'}</td>
-                  <td>
-                    {medio.cajas && medio.cajas.length > 0 ? (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                        {medio.cajas.map((caja) => (
-                          <span key={caja.id} className="badge badge-caja" style={{ marginRight: '4px' }}>
-                            {caja.nombre}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span style={{ color: '#999' }}>Sin cajas asociadas</span>
+                {isVisible('id') && (
+                  <th className="sortable" onClick={() => handleOrdenar('id')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                    ID
+                    {ordenColumna?.columna === 'id' && (
+                      <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
                     )}
+                  </th>
+                )}
+                {isVisible('nombre') && (
+                  <th className="sortable" onClick={() => handleOrdenar('nombre')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                    Nombre
+                    {ordenColumna?.columna === 'nombre' && (
+                      <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                    )}
+                  </th>
+                )}
+                {isVisible('descripcion') && (
+                  <th className="sortable" onClick={() => handleOrdenar('descripcion')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                    Descripción
+                    {ordenColumna?.columna === 'descripcion' && (
+                      <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                    )}
+                  </th>
+                )}
+                {isVisible('caja') && (
+                  <th className="sortable" onClick={() => handleOrdenar('caja')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                    Caja Asociada
+                    {ordenColumna?.columna === 'caja' && (
+                      <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                    )}
+                  </th>
+                )}
+                {isVisible('tipoMovimiento') && (
+                  <th className="sortable" onClick={() => handleOrdenar('tipoMovimiento')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                    Tipo Movimiento
+                    {ordenColumna?.columna === 'tipoMovimiento' && (
+                      <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                    )}
+                  </th>
+                )}
+                {isVisible('estado') && (
+                  <th className="sortable" onClick={() => handleOrdenar('estado')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                    Estado
+                    {ordenColumna?.columna === 'estado' && (
+                      <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                    )}
+                  </th>
+                )}
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mediosOrdenados.length === 0 ? (
+                <tr>
+                  <td colSpan={visible.length + 1} className="sin-datos">
+                    {mediosPago.length === 0 ? 'No hay medios de pago registrados.' : 'No hay medios que coincidan con los filtros.'}
                   </td>
-                  <td>
-                    <span className={`badge badge-tipo-movimiento badge-${medio.tipoMovimiento}`}>
-                      {medio.tipoMovimiento === 'ingreso' ? 'Ingreso' : 
-                       medio.tipoMovimiento === 'egreso' ? 'Egreso' : 'Ambos'}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`badge ${medio.activo ? 'badge-activo' : 'badge-inactivo'}`}>
-                      {medio.activo ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </td>
-                  <td>
+                </tr>
+              ) : (
+                mediosOrdenados.map((medio) => (
+                  <tr key={medio.id}>
+                    {isVisible('id') && <td>{medio.id}</td>}
+                    {isVisible('nombre') && <td>{medio.nombre}</td>}
+                    {isVisible('descripcion') && <td>{medio.descripcion || '-'}</td>}
+                    {isVisible('caja') && (
+                      <td>
+                        {medio.cajas && medio.cajas.length > 0 ? (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                            {medio.cajas.map((caja) => (
+                              <span key={caja.id} className="badge badge-caja" style={{ marginRight: '4px' }}>
+                                {caja.nombre}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ color: '#999' }}>Sin cajas asociadas</span>
+                        )}
+                      </td>
+                    )}
+                    {isVisible('tipoMovimiento') && (
+                      <td>
+                        <span className={`badge badge-tipo-movimiento badge-${medio.tipoMovimiento}`}>
+                          {medio.tipoMovimiento === 'ingreso' ? 'Ingreso' : 
+                           medio.tipoMovimiento === 'egreso' ? 'Egreso' : 'Ambos'}
+                        </span>
+                      </td>
+                    )}
+                    {isVisible('estado') && (
+                      <td>
+                        <span className={`badge ${medio.activo ? 'badge-activo' : 'badge-inactivo'}`}>
+                          {medio.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
+                    )}
+                    <td>
                     <div className="acciones">
                       <button
                         onClick={() => handleModificar(medio)}
@@ -277,12 +357,13 @@ export const ListaMediosPago = () => {
                         🗑️
                       </button>
                     </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

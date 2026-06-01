@@ -1,0 +1,94 @@
+.selector-filtros {
+  position: relative;
+}
+
+.btn-selector-filtros {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--surface-elevated, #fff);
+  color: var(--text-primary, #2d3748);
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.btn-selector-filtros:hover {
+  background: var(--border, #e2e8f0);
+  border-color: var(--text-muted, #718096);
+}
+
+.selector-filtros-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 0.35rem;
+  min-width: 200px;
+  background: var(--surface-elevated, #fff);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border, #e2e8f0);
+  z-index: 100;
+  padding: 0.5rem 0;
+}
+
+.selector-filtros-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem 0.25rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-primary, #2d3748);
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  margin-bottom: 0.25rem;
+}
+
+.selector-filtros-restaurar {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  background: transparent;
+  border: none;
+  color: var(--color-primary, #667eea);
+  cursor: pointer;
+  font-weight: 500;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.selector-filtros-restaurar:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.selector-filtros-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.selector-filtros-lista li {
+  margin: 0;
+}
+
+.selector-filtros-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-primary, #2d3748);
+  transition: background-color 0.15s;
+}
+
+.selector-filtros-label:hover {
+  background: var(--surface, #f7fafc);
+}
+
+.selector-filtros-label input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--color-primary, #667eea);
+}

@@ -13,8 +13,11 @@
   padding: 0.5rem;
 }
 
-.tabla-wrapper {
-  overflow-x: auto;
+.tabla-categorias-container .tabla-wrapper {
+  overflow: auto;
+  max-height: min(75vh, 700px);
+  position: relative;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tabla-categorias {
@@ -26,6 +29,9 @@
 .tabla-categorias thead {
   background-color: #667eea;
   color: white;
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 
 .tabla-categorias th {

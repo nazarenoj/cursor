@@ -4,24 +4,38 @@ import { dibujarEncabezadoConLogo } from './pdfLogo';
 import { apiService } from '../services/api';
 import { exportToExcel } from './exportExcel';
 import type { Categoria, Socio } from '../types';
+import { formatDateOnlyES } from './clubDateTime';
 
 const formatFecha = (fecha: string | null): string => {
-  if (!fecha) return '-';
-  try {
-    return new Date(fecha).toLocaleDateString('es-AR');
-  } catch {
-    return fecha;
-  }
+  return formatDateOnlyES(fecha);
 };
 
 const getNombreCategoria = (categorias: Categoria[], id: number): string => {
   return categorias.find((cat) => cat.id === id)?.nombre ?? 'Sin categoría';
 };
 
+/** Columnas exportables a PDF (id debe coincidir con TablaSocios/ImprimirSocios). Se excluye 'acciones'. */
+const SOCIOS_PDF_COLUMNS: { id: string; header: string; getValue: (s: Socio, getCat: (id: number) => string) => string | number }[] = [
+  { id: 'numeroSocio', header: 'N° Socio', getValue: (s) => s.numeroSocio },
+  { id: 'apellido', header: 'Apellido', getValue: (s) => s.apellido },
+  { id: 'nombre', header: 'Nombre', getValue: (s) => s.nombre },
+  { id: 'dni', header: 'DNI', getValue: (s) => s.dni ?? '-' },
+  { id: 'telefono', header: 'Teléfono', getValue: (s) => s.telefono || '-' },
+  { id: 'email', header: 'Email', getValue: (s) => s.email || '-' },
+  { id: 'categoria', header: 'Categoría', getValue: (s, getCat) => getCat(s.categoriaId) },
+  { id: 'estado', header: 'Estado', getValue: (s) => (s.fechaBaja ? 'Inactivo' : 'Activo') },
+  { id: 'provincia', header: 'Provincia', getValue: (s) => s.provincia ?? '-' },
+  { id: 'localidad', header: 'Localidad', getValue: (s) => s.localidad ?? '-' },
+  { id: 'codigoPostal', header: 'CP', getValue: (s) => s.codigoPostal || '-' },
+  { id: 'fechaAlta', header: 'Fecha Alta', getValue: (s) => formatFecha(s.fechaAlta) },
+  { id: 'fechaBaja', header: 'Fecha Baja', getValue: (s) => formatFecha(s.fechaBaja) },
+];
+
 export const exportarSociosPdf = async (
   socios: Socio[],
   categorias: Categoria[],
   nombreClub: string = 'Club Social Realico',
+  visibleColumnIds?: string[],
 ) => {
   // Registrar exportación en auditoría
   try {
@@ -30,6 +44,14 @@ export const exportarSociosPdf = async (
     // No bloquear la exportación si falla el registro
     console.warn('No se pudo registrar la exportación en auditoría:', err);
   }
+
+  const idsToExport = visibleColumnIds && visibleColumnIds.length > 0
+    ? visibleColumnIds.filter((id) => id !== 'acciones')
+    : SOCIOS_EXCEL_COLUMNS.map((c) => c.id);
+  const columns = SOCIOS_PDF_COLUMNS.filter((c) => idsToExport.includes(c.id));
+  if (columns.length === 0) return;
+
+  const getCat = (id: number) => getNombreCategoria(categorias, id);
   
   const doc = new jsPDF({ orientation: 'landscape' });
   const fecha = new Date().toLocaleString('es-AR');
@@ -55,36 +77,8 @@ export const exportarSociosPdf = async (
       textColor: 45,
       fontSize: 9,
     },
-    head: [
-      [
-        'N° Socio',
-        'Apellido',
-        'Nombre',
-        'DNI',
-        'Categoría',
-        'Teléfono',
-        'Email',
-        'Provincia',
-        'Localidad',
-        'CP',
-        'Fecha Alta',
-        'Fecha Baja',
-      ],
-    ],
-    body: socios.map((socio) => [
-      socio.numeroSocio,
-      socio.apellido,
-      socio.nombre,
-      socio.dni ?? '-',
-      getNombreCategoria(categorias, socio.categoriaId),
-      socio.telefono || '-',
-      socio.email || '-',
-      socio.provincia ?? '-',
-      socio.localidad ?? '-',
-      socio.codigoPostal || '-',
-      formatFecha(socio.fechaAlta),
-      formatFecha(socio.fechaBaja),
-    ]),
+    head: [columns.map((c) => c.header)],
+    body: socios.map((socio) => columns.map((col) => col.getValue(socio, getCat))),
     didDrawPage: (data) => {
       if (data.pageNumber > 1) {
         dibujarEncabezadoConLogo(doc, 'landscape', nombreClub);

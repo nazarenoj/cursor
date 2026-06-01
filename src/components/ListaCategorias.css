@@ -1,6 +1,7 @@
 .lista-categorias {
   padding: 0;
-  max-width: 1000px;
+  width: 100%;
+  max-width: min(95vw, 1600px);
   margin: 0 auto;
 }
 
@@ -56,6 +57,53 @@
 
 .btn-imprimir:hover {
   filter: brightness(1.1);
+}
+
+.filtros-categorias {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: white;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.filtros-categorias .filtro-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 120px;
+}
+
+.filtros-categorias .filtro-group label {
+  font-weight: 600;
+  color: #4a5568;
+  font-size: 0.75rem;
+}
+
+.filtros-categorias .filtro-group input {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.filtros-categorias .btn-limpiar {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.8rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background-color: #edf2f7;
+  color: #1a202c;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.filtros-categorias .btn-limpiar:hover {
+  background-color: #e2e8f0;
 }
 
 .lista-info {

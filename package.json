@@ -1,28 +1,33 @@
 {
   "name": "mi-aplicacion",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.5",
   "type": "module",
   "scripts": {
     "dev": "concurrently -n \"FRONTEND,BACKEND\" -c \"cyan,magenta\" \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:all": "concurrently -n \"FRONTEND,BACKEND,WHATSAPP\" -c \"cyan,magenta,green\" \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:whatsapp\"",
     "dev:frontend": "vite --host",
     "dev:red": "node scripts/mostrar-url-red.js",
     "dev:backend": "npm --prefix server run dev",
+    "dev:whatsapp": "npm --prefix whatsapp-service start",
     "server": "npm --prefix server run dev",
     "build": "tsc && vite build",
+    "deploy:hostinger": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-hostinger.ps1 -ProjectName \"mi-aplicacion\"",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.90.21",
     "chart.js": "^4.5.1",
     "date-fns": "^2.30.0",
-    "jspdf": "^2.5.2",
-    "jspdf-autotable": "^3.8.4",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.21.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",

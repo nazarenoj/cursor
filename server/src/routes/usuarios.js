@@ -4,12 +4,17 @@ const { query, withTransaction } = require('../db');
 const asyncHandler = require('../utils/asyncHandler');
 const { authenticateToken } = require('../middleware/auth');
 const { requirePermission } = require('../middleware/permissions');
+const { registrarAuditoria } = require('../middleware/auditoria');
 
 const router = express.Router();
 
-// Todas las rutas requieren autenticación y permiso de usuarios
+/** Columnas para respuestas al cliente (sin password_hash) */
+const USUARIOS_COLUMNS_PUBLIC = 'id, usuario, activo, oculto';
+
+// Todas las rutas requieren autenticación
 router.use(authenticateToken);
-router.use(requirePermission('usuarios'));
+// Auditoría DESPUÉS de autenticación para que req.user esté disponible
+router.use(registrarAuditoria);
 
 const mapUsuario = (row) => ({
   id: row.id,
@@ -19,19 +24,28 @@ const mapUsuario = (row) => ({
 
 router.get(
   '/usuarios',
+  requirePermission('usuarios.ver'),
   asyncHandler(async (_req, res) => {
-    const rows = await query('SELECT * FROM usuarios ORDER BY usuario ASC');
+    const rows = await query(
+      `SELECT ${USUARIOS_COLUMNS_PUBLIC} FROM usuarios WHERE COALESCE(oculto, 0) = 0 ORDER BY usuario ASC`,
+    );
     res.json(rows.map(mapUsuario));
   }),
 );
 
 router.get(
   '/usuarios/:id',
+  requirePermission('usuarios.ver'),
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
-    const rows = await query('SELECT * FROM usuarios WHERE id = ? LIMIT 1', [id]);
+    const rows = await query(`SELECT ${USUARIOS_COLUMNS_PUBLIC} FROM usuarios WHERE id = ? LIMIT 1`, [id]);
 
     if (rows.length === 0) {
+      const error = new Error('Usuario no encontrado');
+      error.status = 404;
+      throw error;
+    }
+    if (Number(rows[0].oculto) === 1) {
       const error = new Error('Usuario no encontrado');
       error.status = 404;
       throw error;
@@ -43,6 +57,7 @@ router.get(
 
 router.post(
   '/usuarios',
+  requirePermission('usuarios.crear'),
   asyncHandler(async (req, res) => {
     const { usuario, password, activo = true } = req.body || {};
 
@@ -83,9 +98,10 @@ router.post(
         [usuario, passwordHash, activo ? 1 : 0],
       );
 
-      const [newRows] = await conn.execute('SELECT * FROM usuarios WHERE id = ? LIMIT 1', [
-        insertResult.insertId,
-      ]);
+      const [newRows] = await conn.execute(
+        `SELECT ${USUARIOS_COLUMNS_PUBLIC} FROM usuarios WHERE id = ? LIMIT 1`,
+        [insertResult.insertId],
+      );
 
       return newRows[0];
     });
@@ -96,14 +112,23 @@ router.post(
 
 router.put(
   '/usuarios/:id',
+  requirePermission('usuarios.modificar'),
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
     const { usuario, password, activo } = req.body || {};
 
     const result = await withTransaction(async (conn) => {
-      const [existentes] = await conn.execute('SELECT * FROM usuarios WHERE id = ? LIMIT 1', [id]);
+      const [existentes] = await conn.execute(
+        `SELECT ${USUARIOS_COLUMNS_PUBLIC} FROM usuarios WHERE id = ? LIMIT 1`,
+        [id],
+      );
 
       if (existentes.length === 0) {
+        const error = new Error('Usuario no encontrado');
+        error.status = 404;
+        throw error;
+      }
+      if (Number(existentes[0].oculto) === 1) {
         const error = new Error('Usuario no encontrado');
         error.status = 404;
         throw error;
@@ -158,7 +183,10 @@ router.put(
       values.push(id);
       await conn.execute(`UPDATE usuarios SET ${updates.join(', ')} WHERE id = ?`, values);
 
-      const [updatedRows] = await conn.execute('SELECT * FROM usuarios WHERE id = ? LIMIT 1', [id]);
+      const [updatedRows] = await conn.execute(
+        `SELECT ${USUARIOS_COLUMNS_PUBLIC} FROM usuarios WHERE id = ? LIMIT 1`,
+        [id],
+      );
       return updatedRows[0];
     });
 
@@ -168,11 +196,12 @@ router.put(
 
 router.delete(
   '/usuarios/:id',
+  requirePermission('usuarios.eliminar'),
   asyncHandler(async (req, res) => {
     const id = Number(req.params.id);
 
     await withTransaction(async (conn) => {
-      const [existentes] = await conn.execute('SELECT usuario FROM usuarios WHERE id = ? LIMIT 1', [id]);
+      const [existentes] = await conn.execute('SELECT usuario, oculto FROM usuarios WHERE id = ? LIMIT 1', [id]);
 
       if (existentes.length === 0) {
         const error = new Error('Usuario no encontrado');
@@ -180,9 +209,13 @@ router.delete(
         throw error;
       }
 
-      // No permitir eliminar el usuario admin
       if (existentes[0].usuario === 'admin') {
         const error = new Error('No se puede eliminar el usuario administrador');
+        error.status = 403;
+        throw error;
+      }
+      if (Number(existentes[0].oculto) === 1) {
+        const error = new Error('No se puede eliminar este usuario');
         error.status = 403;
         throw error;
       }

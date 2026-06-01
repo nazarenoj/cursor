@@ -12,6 +12,8 @@ interface SelectorColumnasProps {
   onToggle: (columnId: string) => void;
   onRestaurar: () => void;
   titulo?: string;
+  /** Texto del botón (ej. "Columnas" o "Filtros") */
+  labelBoton?: string;
 }
 
 export function SelectorColumnas({
@@ -20,6 +22,7 @@ export function SelectorColumnas({
   onToggle,
   onRestaurar,
   titulo = 'Columnas visibles',
+  labelBoton = 'Columnas',
 }: SelectorColumnasProps) {
   const [abierto, setAbierto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -42,11 +45,11 @@ export function SelectorColumnas({
         type="button"
         className="btn-selector-columnas"
         onClick={() => setAbierto((o) => !o)}
-        title="Seleccionar columnas visibles"
+        title={titulo}
         aria-expanded={abierto}
         aria-haspopup="true"
       >
-        ⚙️ Columnas
+        ⚙️ {labelBoton}
       </button>
       {abierto && (
         <div className="selector-columnas-dropdown" role="dialog" aria-label={titulo}>

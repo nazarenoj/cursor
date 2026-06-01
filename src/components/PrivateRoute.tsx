@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useClubConfig } from '../contexts/ClubConfigContext';
 
 interface PrivateRouteProps {
   children: React.ReactNode;
@@ -7,8 +8,9 @@ interface PrivateRouteProps {
 
 export const PrivateRoute = ({ children }: PrivateRouteProps) => {
   const { isAuthenticated, loading } = useAuth();
+  const { loading: clubConfigLoading } = useClubConfig();
 
-  if (loading) {
+  if (loading || (isAuthenticated && clubConfigLoading)) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
         <div>Cargando...</div>

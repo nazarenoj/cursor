@@ -1,9 +1,9 @@
-import { format } from 'date-fns';
 import { useState, useMemo } from 'react';
 import { useColumnPreferences } from '../hooks/useColumnPreferences';
 import { SelectorColumnas } from './SelectorColumnas';
 import type { LiquidacionCuota, LiquidacionMensual } from '../types';
 import './TablaLiquidacionesMensuales.css';
+import { formatDateOnlyES } from '../utils/clubDateTime';
 
 const LIQUIDACIONES_COLUMNS = [
   { id: 'mes', label: 'Mes' },
@@ -25,6 +25,10 @@ interface TablaLiquidacionesMensualesProps {
   onEnviarWhatsApp?: (mes: string) => void;
   /** Botones adicionales para mostrar en la misma línea que el selector de columnas */
   extraActions?: React.ReactNode;
+  /** Filtros (primera fila) */
+  filtros?: React.ReactNode;
+  /** Selector "Filtros visibles" (segunda fila, misma lógica que selector de columnas) */
+  selectorFiltrosVisibles?: React.ReactNode;
 }
 
 interface ResumenMensual {
@@ -51,6 +55,8 @@ export const TablaLiquidacionesMensuales = ({
   onBorrar,
   onEnviarWhatsApp,
   extraActions,
+  filtros,
+  selectorFiltrosVisibles,
 }: TablaLiquidacionesMensualesProps) => {
   const { visibleColumns, setVisibleColumns, toggleColumn, loading: loadingCols } = useColumnPreferences(
     'liquidaciones',
@@ -86,6 +92,7 @@ export const TablaLiquidacionesMensuales = ({
     };
   };
 
+  // Orden por defecto: más reciente primero (mes descendente). Ver plan "Mensajes a socios y liquidaciones".
   const liquidacionesOrdenadas = useMemo(() => {
     const list = [...liquidacionesMensuales];
     if (!ordenColumna) return list.sort((a, b) => b.mes.localeCompare(a.mes));
@@ -123,8 +130,9 @@ export const TablaLiquidacionesMensuales = ({
   if (liquidacionesMensuales.length === 0) {
     return (
       <div className="tabla-liquidaciones-mensuales-container">
-        <div className="tabla-wrapper">
-          <div className="tabla-acciones-superior">
+        <div className="tabla-acciones-superior">
+          {filtros && <div className="tabla-fila-filtros">{filtros}</div>}
+          <div className="tabla-fila-acciones">
             <SelectorColumnas
               columnas={LIQUIDACIONES_COLUMNS}
               visibleIds={visible}
@@ -132,8 +140,11 @@ export const TablaLiquidacionesMensuales = ({
               onRestaurar={() => setVisibleColumns(LIQUIDACIONES_DEFAULT_VISIBLE)}
               titulo="Columnas visibles"
             />
+            {selectorFiltrosVisibles}
             {extraActions}
           </div>
+        </div>
+        <div className="tabla-wrapper">
           <div className="tabla-vacia">
             <p>No hay liquidaciones mensuales registradas.</p>
             <p className="subtitulo">Genera una liquidación mensual para comenzar.</p>
@@ -145,8 +156,9 @@ export const TablaLiquidacionesMensuales = ({
 
   return (
     <div className="tabla-liquidaciones-mensuales-container">
-      <div className="tabla-wrapper">
-        <div className="tabla-acciones-superior">
+      <div className="tabla-acciones-superior">
+        {filtros && <div className="tabla-fila-filtros">{filtros}</div>}
+        <div className="tabla-fila-acciones">
           <SelectorColumnas
             columnas={LIQUIDACIONES_COLUMNS}
             visibleIds={visible}
@@ -154,8 +166,11 @@ export const TablaLiquidacionesMensuales = ({
             onRestaurar={() => setVisibleColumns(LIQUIDACIONES_DEFAULT_VISIBLE)}
             titulo="Columnas visibles"
           />
+          {selectorFiltrosVisibles}
           {extraActions}
         </div>
+      </div>
+      <div className="tabla-wrapper">
         <table className="tabla-liquidaciones-mensuales">
           <thead>
             <tr>
@@ -242,9 +257,7 @@ export const TablaLiquidacionesMensuales = ({
                   {isVisible('mes') && <td className="col-mes">{getNombreMes(resumen.mes)}</td>}
                   {isVisible('fechaLiquidacion') && (
                     <td>
-                      {resumen.fechaLiquidacion
-                        ? format(new Date(resumen.fechaLiquidacion), 'dd/MM/yyyy')
-                        : '-'}
+                      {formatDateOnlyES(resumen.fechaLiquidacion)}
                     </td>
                   )}
                   {isVisible('socios') && <td>{resumen.totalSocios}</td>}
@@ -272,7 +285,7 @@ export const TablaLiquidacionesMensuales = ({
                           <button
                             onClick={() => onEnviarWhatsApp(resumen.mes)}
                             className="btn-accion btn-whatsapp"
-                            title="Enviar por WhatsApp"
+                            title="Mensajes a socios"
                           >
                             📱
                           </button>

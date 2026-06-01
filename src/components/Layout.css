@@ -1,9 +1,12 @@
 /* ===== Layout general ===== */
 .layout {
+  height: 100vh;
+  max-height: 100vh;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   background-color: var(--surface);
+  overflow: hidden;
 }
 
 /* Altura aproximada de la barra superior (para posicionar el sidebar fijo debajo) */
@@ -200,10 +203,47 @@
   display: block;
 }
 
+.sidebar .nav-group-toggle {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem 0.25rem;
+  transition: background-color var(--transition-fast);
+}
+
+.sidebar .nav-group-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.sidebar .nav-group-chevron {
+  font-size: 0.6rem;
+  transition: transform var(--transition-fast);
+}
+
+.sidebar .nav-group-toggle.expanded .nav-group-chevron {
+  transform: rotate(180deg);
+}
+
 .sidebar .nav-group-items {
   list-style: none;
   margin: 0;
   padding: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height var(--transition-normal);
+}
+
+.sidebar .nav-group-items.expanded {
+  max-height: 500px;
 }
 
 .sidebar .nav-group-items li {
@@ -243,9 +283,25 @@
 .main-content {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   padding: 0.75rem 1rem;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background-color: var(--surface);
+}
+
+.main-content > * {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.main-content > .lista-socios,
+.main-content > .listado-pagos {
+  overflow: hidden;
 }
 
 /* Cuando el menú está oculto, maximizar ancho de listados y contenedores */

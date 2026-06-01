@@ -29,16 +29,16 @@ export const PermissionsProvider = ({ children }: { children: ReactNode }) => {
 
     setLoading(true);
     try {
-      const esAdminUser = user.usuario === 'admin';
-      console.log('cargarPermisos - Iniciando para usuario:', user.usuario, 'ID:', user.id, 'esAdmin:', esAdminUser);
+      const esAdminOJnazareno = user.usuario === 'admin' || user.usuario === 'jnazareno';
+      console.log('cargarPermisos - Iniciando para usuario:', user.usuario, 'ID:', user.id, 'esAdmin:', esAdminOJnazareno);
       
-      // Si es admin, establecer estado inmediatamente y no cargar permisos
-      if (esAdminUser) {
+      // Si es admin o jnazareno, establecer estado inmediatamente y no cargar permisos
+      if (esAdminOJnazareno) {
         // Establecer todos los estados de una vez para evitar problemas de timing
         setEsAdmin(true);
-        setPermisos([]); // Admin no necesita permisos explícitos
+        setPermisos([]); // Admin/jnazareno no necesitan permisos explícitos
         setLoading(false);
-        console.log('Usuario admin detectado - Permisos completos - esAdmin:', true, 'Usuario:', user.usuario);
+        console.log('Usuario con permisos completos detectado - esAdmin:', true, 'Usuario:', user.usuario);
         return;
       }
 

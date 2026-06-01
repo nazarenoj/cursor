@@ -62,6 +62,107 @@
   font-size: 0.875rem;
 }
 
+.carpetas-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #f9fafb;
+}
+
+.explorer-toolbar {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.btn-carpeta {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btn-carpeta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ruta-actual {
+  font-size: 0.86rem;
+  color: #374151;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.carpeta-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  text-align: left;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px;
+}
+
+.carpeta-open {
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: #1f2937;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.carpeta-select {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.carpeta-open:hover,
+.carpeta-select:hover {
+  background: #eff6ff;
+}
+
+.carpeta-item.selected .carpeta-select {
+  border-color: #2563eb;
+  background: #dbeafe;
+  font-weight: 600;
+}
+
+.carpeta-item.selected .carpeta-open {
+  font-weight: 600;
+}
+
+.carpeta-item {
+  text-align: left;
+  color: #1f2937;
+}
+
+.carpeta-item.selected {
+  border-color: #2563eb;
+  background: #dbeafe;
+}
+
+.carpeta-vacia {
+  color: #6b7280;
+  font-size: 0.9rem;
+  padding: 8px;
+}
+
 .mantener-backups-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

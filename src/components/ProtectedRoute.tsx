@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '../contexts/PermissionsContext';
 import { getFirstAllowedRoute } from '../utils/getFirstAllowedRoute';
 
@@ -9,30 +10,30 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children, permiso }: ProtectedRouteProps) => {
+  const { user } = useAuth();
   const { tienePermiso, loading, permisos, esAdmin } = usePermissions();
   const navigate = useNavigate();
 
+  // Admin y jnazareno tienen acceso total; evita race con carga de permisos
+  const tieneAccesoTotal = user?.usuario === 'admin' || user?.usuario === 'jnazareno';
+  const permitido = tieneAccesoTotal || tienePermiso(permiso);
+
   useEffect(() => {
-    if (!loading && !tienePermiso(permiso)) {
+    if (!loading && !permitido) {
       // Redirigir a la primera página permitida
-      const firstRoute = getFirstAllowedRoute(permisos, esAdmin);
-      console.log('ProtectedRoute: Sin permiso para', permiso, '- Redirigiendo a:', firstRoute, { tienePermiso: tienePermiso(permiso), permisos, esAdmin });
+      const firstRoute = getFirstAllowedRoute(permisos, esAdmin || tieneAccesoTotal);
       
       if (firstRoute) {
-        // Si hay una ruta permitida, redirigir a ella
         navigate(firstRoute, { replace: true });
       } else {
-        // Si no hay ninguna ruta permitida, redirigir a sin-permisos
-        // Pero nunca para admin (admin siempre tiene permisos)
-        if (!esAdmin) {
+        if (!esAdmin && !tieneAccesoTotal) {
           navigate('/sin-permisos', { replace: true });
         } else {
-          // Fallback para admin (nunca debería llegar aquí)
           navigate('/socios', { replace: true });
         }
       }
     }
-  }, [loading, tienePermiso, permiso, permisos, esAdmin, navigate]);
+  }, [loading, permitido, permisos, esAdmin, tieneAccesoTotal, navigate]);
 
   if (loading) {
     return (
@@ -42,7 +43,7 @@ export const ProtectedRoute = ({ children, permiso }: ProtectedRouteProps) => {
     );
   }
 
-  if (!tienePermiso(permiso)) {
+  if (!permitido) {
     // Mientras redirige, mostrar mensaje
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>

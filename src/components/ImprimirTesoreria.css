@@ -81,53 +81,53 @@
 
 .resumen-impresion {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
-  margin-bottom: 2.5rem;
-  padding: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+  padding: 0.4rem 0.5rem;
   background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
-  border-radius: 12px;
-  border: 2px solid #e2e8f0;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
 }
 
-.resumen-item {
+.resumen-impresion .resumen-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  padding: 1rem;
+  gap: 0.15rem;
+  padding: 0.25rem 0.4rem;
   background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-.resumen-total {
+.resumen-impresion .resumen-total {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   grid-column: 1 / -1;
 }
 
-.resumen-total .resumen-label,
-.resumen-total .resumen-valor {
+.resumen-impresion .resumen-total .resumen-label,
+.resumen-impresion .resumen-total .resumen-valor {
   color: white;
 }
 
-.resumen-label {
-  font-size: 0.95rem;
+.resumen-impresion .resumen-label {
+  font-size: 0.6rem;
   color: #666;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 }
 
-.resumen-valor {
-  font-size: 1.8rem;
+.resumen-impresion .resumen-valor {
+  font-size: 0.75rem;
   font-weight: 700;
   color: #2d3748;
 }
 
-.resumen-total .resumen-valor {
-  font-size: 2.5rem;
+.resumen-impresion .resumen-total .resumen-valor {
+  font-size: 0.85rem;
 }
 
 .medio-section-impresion {
@@ -286,33 +286,33 @@
 
   .resumen-impresion {
     page-break-after: avoid;
-    margin-bottom: 1.5rem;
+    margin-bottom: 0.5rem;
     display: grid !important;
     background: white !important;
     border: 1px solid #000 !important;
     border-radius: 0 !important;
-    padding: 1rem !important;
+    padding: 0.4rem !important;
   }
 
-  .resumen-item {
+  .resumen-impresion .resumen-item {
     background: white !important;
     border: 1px solid #ccc !important;
     box-shadow: none !important;
     border-radius: 0 !important;
   }
 
-  .resumen-total {
+  .resumen-impresion .resumen-total {
     background: white !important;
     border: 2px solid #000 !important;
   }
 
-  .resumen-label,
-  .resumen-valor {
+  .resumen-impresion .resumen-label,
+  .resumen-impresion .resumen-valor {
     color: #000 !important;
   }
 
-  .resumen-total .resumen-label,
-  .resumen-total .resumen-valor {
+  .resumen-impresion .resumen-total .resumen-label,
+  .resumen-impresion .resumen-total .resumen-valor {
     color: #000 !important;
   }
 

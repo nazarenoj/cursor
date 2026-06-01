@@ -2,18 +2,37 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/api';
+import { APP_VERSION } from '../version';
 import './Login.css';
+
+const CLUB_CONFIG_CACHE_KEY = 'club-config-cache-v1';
 
 const getLogoFullUrl = (url: string | null): string => {
   if (!url) return '/logo.svg';
   if (url.startsWith('http')) return url;
   const hostname = window.location.hostname;
-  const protocol = window.location.protocol;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return `http://localhost:4000${url}`;
+  const apiBase =
+    import.meta.env.PROD
+      ? `${window.location.origin}/api`
+      : import.meta.env.VITE_API_URL ||
+        (hostname === 'localhost' || hostname === '127.0.0.1'
+          ? 'http://localhost:4000/api'
+          : `${window.location.origin}/api`);
+  return apiBase.replace(/\/api$/, '') + url;
+};
+
+const persistCachedConfig = (config: {
+  nombreClub: string;
+  logoUrl: string | null;
+  colorPrimario: string;
+  timezone: string;
+  appVersion?: string;
+}) => {
+  try {
+    localStorage.setItem(CLUB_CONFIG_CACHE_KEY, JSON.stringify(config));
+  } catch {
+    // Ignorar si localStorage no está disponible
   }
-  const portPart = window.location.port ? `:${window.location.port}` : '';
-  return `${protocol}//${hostname}${portPart}${url}`;
 };
 
 export const Login = () => {
@@ -23,24 +42,71 @@ export const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configError, setConfigError] = useState('');
   const [config, setConfig] = useState<{
     nombreClub: string;
     logoUrl: string | null;
     colorPrimario: string;
-  }>({ nombreClub: 'Club Social Realico', logoUrl: null, colorPrimario: '#667eea' });
+    timezone: string;
+    appVersion?: string;
+  } | null>(null);
+
+  const cargarConfigPublica = async () => {
+    setConfigLoading(true);
+    setConfigError('');
+    try {
+      const data = await apiService.getClubConfigPublic();
+      setConfig({
+        nombreClub: data.nombreClub,
+        logoUrl: data.logoUrl ?? null,
+        colorPrimario: data.colorPrimario,
+        timezone: data.timezone,
+        appVersion: typeof data.appVersion === 'string' ? data.appVersion : undefined,
+      });
+      persistCachedConfig({
+        nombreClub: data.nombreClub,
+        logoUrl: data.logoUrl ?? null,
+        colorPrimario: data.colorPrimario,
+        timezone: data.timezone,
+        appVersion: typeof data.appVersion === 'string' ? data.appVersion : undefined,
+      });
+    } catch (e) {
+      setConfig(null);
+      setConfigError('No se pudo cargar la configuración del club. Verificá la conexión e intentá nuevamente.');
+    } finally {
+      setConfigLoading(false);
+    }
+  };
 
   useEffect(() => {
-    apiService
-      .getClubConfigPublic()
-      .then((data) =>
-        setConfig({
-          nombreClub: data.nombreClub ?? 'Club Social Realico',
-          logoUrl: data.logoUrl ?? null,
-          colorPrimario: data.colorPrimario ?? '#667eea',
-        }),
-      )
-      .catch(() => {});
+    cargarConfigPublica();
+    // solo al montar
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  if (configLoading) {
+    return (
+      <div className="login-container login-state-container">
+        <div className="login-card login-state-card">
+          <p>Cargando datos del club...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!config) {
+    return (
+      <div className="login-container login-state-container">
+        <div className="login-card login-state-card">
+          <p className="error-message">{configError}</p>
+          <button type="button" className="btn-login" onClick={cargarConfigPublica}>
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,6 +138,9 @@ export const Login = () => {
           />
           <h1>{config.nombreClub}</h1>
           <p>Sistema de Gestión de Socios</p>
+          <div className="login-version">
+            Versión v{config.appVersion ?? APP_VERSION}
+          </div>
         </div>
         <form onSubmit={handleSubmit} className="login-form">
           <div className="form-group">

@@ -1,11 +1,9 @@
 import { format } from 'date-fns';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { useClubConfig } from '../contexts/ClubConfigContext';
 import { dibujarEncabezadoConLogo } from '../utils/pdfLogo';
 import { apiService } from '../services/api';
-import { exportToExcel } from '../utils/exportExcel';
 import type { LiquidacionCuota } from '../types';
+import { formatDateOnlyES } from '../utils/clubDateTime';
 import './ImprimirLiquidaciones.css';
 
 interface ImprimirLiquidacionesProps {
@@ -27,7 +25,10 @@ export const ImprimirLiquidaciones = ({ liquidaciones, mesFiltro, onVolver }: Im
       // No bloquear la exportación si falla el registro
       console.warn('No se pudo registrar la exportación en auditoría:', err);
     }
-    
+    const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable'),
+    ]);
     const doc = new jsPDF({ orientation: 'landscape' });
     const fecha = new Date().toLocaleString('es-AR');
 
@@ -103,7 +104,7 @@ export const ImprimirLiquidaciones = ({ liquidaciones, mesFiltro, onVolver }: Im
     doc.save(`Listado-Liquidaciones-${Date.now()}.pdf`);
   };
 
-  const handleExportarExcel = () => {
+  const handleExportarExcel = async () => {
     if (liquidaciones.length === 0) return;
     try {
       apiService.registrarExportacion('liquidaciones', 'Excel', { total: liquidaciones.length, mes: mesFiltro }).catch(console.warn);
@@ -122,16 +123,12 @@ export const ImprimirLiquidaciones = ({ liquidaciones, mesFiltro, onVolver }: Im
       'Fecha Pago': formatFecha(liquidacion.fechaPago),
       'Medio de Pago': liquidacion.medioPago ?? '-',
     }));
+    const { exportToExcel } = await import('../utils/exportExcel');
     exportToExcel(data, `Listado-Liquidaciones-${Date.now()}`, 'Liquidaciones');
   };
 
   const formatFecha = (fecha: string | null) => {
-    if (!fecha) return '-';
-    try {
-      return format(new Date(fecha), 'dd/MM/yyyy');
-    } catch {
-      return fecha;
-    }
+    return formatDateOnlyES(fecha);
   };
 
   const getNombreMes = (mesString: string) => {

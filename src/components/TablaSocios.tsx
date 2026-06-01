@@ -28,13 +28,24 @@ interface TablaSociosProps {
   onVerLiquidaciones: (socio: Socio) => void;
   onRegistrarPago: (socio: Socio) => void;
   onEnviarLiquidacionesWhatsApp?: (socio: Socio) => void;
-  onExportPdf: () => void;
+  /** Recibe las columnas visibles para exportar solo esas a PDF */
+  onExportPdf: (visibleColumnIds: string[]) => void;
   /** Si se pasa, recibe las columnas visibles para exportar solo esas a Excel */
   onExportExcel?: (visibleColumnIds: string[]) => void;
   onAgregar?: () => void;
   ordenColumna?: { columna: string; direccion: 'asc' | 'desc' } | null;
   onOrdenar?: (columna: string) => void;
   filtroEstado?: boolean | undefined;
+  /** Selección para envío masivo */
+  seleccionados?: Set<number>;
+  onToggleSeleccion?: (id: number) => void;
+  onSeleccionarTodos?: () => void;
+  onDeseleccionarTodos?: () => void;
+  onEnvioMasivo?: () => void;
+  /** Selector de filtros visibles (segunda fila, junto a columnas y botones) */
+  selectorFiltros?: React.ReactNode;
+  /** Filtros (primera fila) */
+  filtros?: React.ReactNode;
 }
 
 export const TablaSocios = ({
@@ -53,6 +64,13 @@ export const TablaSocios = ({
   ordenColumna,
   onOrdenar,
   filtroEstado,
+  seleccionados,
+  onToggleSeleccion,
+  onSeleccionarTodos,
+  onDeseleccionarTodos,
+  onEnvioMasivo,
+  selectorFiltros,
+  filtros,
 }: TablaSociosProps) => {
   const { tienePermiso } = usePermissions();
   const { visibleColumns, setVisibleColumns, toggleColumn, loading } = useColumnPreferences(
@@ -70,34 +88,43 @@ export const TablaSocios = ({
 
   const accionesSuperior = (
     <div className="tabla-acciones-superior">
-      <SelectorColumnas
-        columnas={SOCIOS_COLUMNS}
-        visibleIds={visible}
-        onToggle={toggleColumn}
-        onRestaurar={() => setVisibleColumns(DEFAULT_VISIBLE)}
-        titulo="Columnas visibles"
-      />
-      {onAgregar && (
-        <button className="btn-agregar" onClick={onAgregar}>
-          + Agregar Socio
+      {filtros && <div className="tabla-fila-filtros">{filtros}</div>}
+      <div className="tabla-fila-acciones">
+        {onEnvioMasivo && seleccionados && seleccionados.size > 0 && (
+          <button className="btn-envio-masivo" onClick={onEnvioMasivo} title="Enviar mensajes a los socios seleccionados">
+            📱 Mensajes a socios ({seleccionados.size})
+          </button>
+        )}
+        {selectorFiltros}
+        <SelectorColumnas
+          columnas={SOCIOS_COLUMNS}
+          visibleIds={visible}
+          onToggle={toggleColumn}
+          onRestaurar={() => setVisibleColumns(DEFAULT_VISIBLE)}
+          titulo="Columnas visibles"
+        />
+        {onAgregar && (
+          <button className="btn-agregar" onClick={onAgregar}>
+            + Agregar Socio
+          </button>
+        )}
+        <button className="btn-exportar" onClick={() => onExportPdf(visible)} title="Exportar a PDF">
+          📄 Exportar PDF
         </button>
-      )}
-      <button className="btn-exportar" onClick={onExportPdf} title="Exportar a PDF">
-        📄 Exportar PDF
-      </button>
-      {onExportExcel && (
-        <button className="btn-exportar btn-exportar-excel" onClick={() => onExportExcel(visible)} title="Exportar a Excel">
-          📊 Exportar Excel
-        </button>
-      )}
+        {onExportExcel && (
+          <button className="btn-exportar btn-exportar-excel" onClick={() => onExportExcel(visible)} title="Exportar a Excel">
+            📊 Exportar Excel
+          </button>
+        )}
+      </div>
     </div>
   );
 
   if (socios.length === 0) {
     return (
       <div className="tabla-socios-container">
+        {accionesSuperior}
         <div className="tabla-wrapper">
-          {accionesSuperior}
           <div className="tabla-vacia">
             <p>No se encontraron socios con los filtros aplicados.</p>
           </div>
@@ -108,11 +135,24 @@ export const TablaSocios = ({
 
   return (
     <div className="tabla-socios-container">
+      {accionesSuperior}
       <div className="tabla-wrapper">
-        {accionesSuperior}
         <table className="tabla-socios">
           <thead>
             <tr>
+              {onToggleSeleccion && (
+                <th className="columna-seleccion">
+                  <input
+                    type="checkbox"
+                    checked={seleccionados && socios.length > 0 && seleccionados.size === socios.length}
+                    onChange={(e) => {
+                      if (e.target.checked) onSeleccionarTodos?.();
+                      else onDeseleccionarTodos?.();
+                    }}
+                    title={seleccionados?.size === socios.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                  />
+                </th>
+              )}
               {isVisible('numeroSocio') && (
                 <th
                   className={onOrdenar ? 'sortable' : ''}
@@ -235,6 +275,15 @@ export const TablaSocios = ({
           <tbody>
             {socios.map((socio) => (
               <tr key={socio.id} className={socio.fechaBaja ? 'inactivo' : ''}>
+                {onToggleSeleccion && (
+                  <td className="columna-seleccion">
+                    <input
+                      type="checkbox"
+                      checked={seleccionados?.has(socio.id) ?? false}
+                      onChange={() => onToggleSeleccion(socio.id)}
+                    />
+                  </td>
+                )}
                 {isVisible('numeroSocio') && <td>{socio.numeroSocio}</td>}
                 {isVisible('apellido') && <td>{socio.apellido}</td>}
                 {isVisible('nombre') && <td className="columna-nombre">{socio.nombre}</td>}

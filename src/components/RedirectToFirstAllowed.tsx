@@ -29,8 +29,8 @@ export const RedirectToFirstAllowed = () => {
       return;
     }
 
-    // Verificar si es admin directamente por el usuario (fallback)
-    const esAdminDirecto = user?.usuario === 'admin';
+    // Verificar si es admin o jnazareno directamente por el usuario (fallback)
+    const esAdminDirecto = user?.usuario === 'admin' || user?.usuario === 'jnazareno';
     console.log('RedirectToFirstAllowed: Estado actual:', { 
       esAdmin, 
       esAdminDirecto,

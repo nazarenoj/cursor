@@ -1,11 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { apiService } from '../services/api';
 import type { Caja } from '../types';
 import { ResumenCaja } from './ResumenCaja';
 import { TransferirEntreCajas } from './TransferirEntreCajas';
 import { RegistrarEgreso } from './RegistrarEgreso';
 import { usePermissions } from '../contexts/PermissionsContext';
+import { useColumnPreferences } from '../hooks/useColumnPreferences';
+import { SelectorColumnas } from './SelectorColumnas';
 import './ListaCajas.css';
+
+const CAJAS_COLUMNS = [
+  { id: 'id', label: 'ID' },
+  { id: 'nombre', label: 'Nombre' },
+  { id: 'descripcion', label: 'Descripción' },
+  { id: 'saldoActual', label: 'Saldo Actual' },
+  { id: 'estado', label: 'Estado' },
+];
+const CAJAS_DEFAULT_VISIBLE = CAJAS_COLUMNS.map((c) => c.id);
+
+type FiltrosCajas = {
+  nombre: string;
+  descripcion: string;
+  estado: '' | 'activa' | 'inactiva';
+};
 
 export const ListaCajas = () => {
   const [cajas, setCajas] = useState<Caja[]>([]);
@@ -17,7 +34,18 @@ export const ListaCajas = () => {
   const [mostrarRegistrarMovimiento, setMostrarRegistrarMovimiento] = useState(false);
   const [error, setError] = useState('');
   const [ordenColumna, setOrdenColumna] = useState<{ columna: string; direccion: 'asc' | 'desc' } | null>(null);
+  const [filtros, setFiltros] = useState<FiltrosCajas>({
+    nombre: '',
+    descripcion: '',
+    estado: '',
+  });
   const { tienePermiso } = usePermissions();
+  const { visibleColumns, setVisibleColumns, toggleColumn, loading: loadingCols } = useColumnPreferences(
+    'cajas',
+    CAJAS_DEFAULT_VISIBLE,
+  );
+  const visible = loadingCols ? CAJAS_DEFAULT_VISIBLE : visibleColumns;
+  const isVisible = (id: string) => visible.includes(id);
 
   const handleOrdenar = (columna: string) => {
     if (ordenColumna && ordenColumna.columna === columna) {
@@ -27,31 +55,43 @@ export const ListaCajas = () => {
     }
   };
 
-  const cajasOrdenadas = [...cajas].sort((a, b) => {
-    if (!ordenColumna) return 0;
-    const { columna, direccion } = ordenColumna;
-    let comparacion = 0;
-    switch (columna) {
-      case 'id':
-        comparacion = a.id - b.id;
-        break;
-      case 'nombre':
-        comparacion = a.nombre.localeCompare(b.nombre);
-        break;
-      case 'descripcion':
-        comparacion = (a.descripcion || '').localeCompare(b.descripcion || '');
-        break;
-      case 'saldoActual':
-        comparacion = a.saldoActual - b.saldoActual;
-        break;
-      case 'estado':
-        comparacion = (a.activa ? 1 : 0) - (b.activa ? 1 : 0);
-        break;
-      default:
-        return 0;
-    }
-    return direccion === 'asc' ? comparacion : -comparacion;
-  });
+  const cajasFiltradas = useMemo(() => {
+    return cajas.filter((c) => {
+      if (filtros.nombre && !c.nombre.toLowerCase().includes(filtros.nombre.toLowerCase())) return false;
+      if (filtros.descripcion && !(c.descripcion || '').toLowerCase().includes(filtros.descripcion.toLowerCase())) return false;
+      if (filtros.estado === 'activa' && !c.activa) return false;
+      if (filtros.estado === 'inactiva' && c.activa) return false;
+      return true;
+    });
+  }, [cajas, filtros]);
+
+  const cajasOrdenadas = useMemo(() => {
+    return [...cajasFiltradas].sort((a, b) => {
+      if (!ordenColumna) return 0;
+      const { columna, direccion } = ordenColumna;
+      let comparacion = 0;
+      switch (columna) {
+        case 'id':
+          comparacion = a.id - b.id;
+          break;
+        case 'nombre':
+          comparacion = a.nombre.localeCompare(b.nombre);
+          break;
+        case 'descripcion':
+          comparacion = (a.descripcion || '').localeCompare(b.descripcion || '');
+          break;
+        case 'saldoActual':
+          comparacion = a.saldoActual - b.saldoActual;
+          break;
+        case 'estado':
+          comparacion = (a.activa ? 1 : 0) - (b.activa ? 1 : 0);
+          break;
+        default:
+          return 0;
+      }
+      return direccion === 'asc' ? comparacion : -comparacion;
+    });
+  }, [cajasFiltradas, ordenColumna]);
 
   useEffect(() => {
     loadCajas();
@@ -196,118 +236,148 @@ export const ListaCajas = () => {
 
         {error && <div className="error-message">{error}</div>}
 
-        <div className="lista-info">
-          <p>Total de cajas: {cajas.length}</p>
+        <div className="filtros-cajas">
+          <div className="filtro-group">
+            <label htmlFor="filtro-nombre">Nombre:</label>
+            <input
+              type="text"
+              id="filtro-nombre"
+              placeholder="Buscar por nombre"
+              value={filtros.nombre}
+              onChange={(e) => setFiltros((p) => ({ ...p, nombre: e.target.value }))}
+            />
+          </div>
+          <div className="filtro-group">
+            <label htmlFor="filtro-descripcion">Descripción:</label>
+            <input
+              type="text"
+              id="filtro-descripcion"
+              placeholder="Buscar por descripción"
+              value={filtros.descripcion}
+              onChange={(e) => setFiltros((p) => ({ ...p, descripcion: e.target.value }))}
+            />
+          </div>
+          <div className="filtro-group">
+            <label htmlFor="filtro-estado">Estado:</label>
+            <select
+              id="filtro-estado"
+              value={filtros.estado}
+              onChange={(e) => setFiltros((p) => ({ ...p, estado: e.target.value as FiltrosCajas['estado'] }))}
+            >
+              <option value="">Todos</option>
+              <option value="activa">Activa</option>
+              <option value="inactiva">Inactiva</option>
+            </select>
+          </div>
+          <div className="filtro-acciones">
+            <button type="button" className="btn-limpiar" onClick={() => setFiltros({ nombre: '', descripcion: '', estado: '' })}>
+              Limpiar filtros
+            </button>
+          </div>
         </div>
 
-        <div className="tabla-wrapper">
-          <table className="tabla-cajas">
-            <thead>
-              <tr>
-                <th
-                  className="sortable"
-                  onClick={() => handleOrdenar('id')}
-                  style={{ cursor: 'pointer', userSelect: 'none' }}
-                >
-                  ID
-                  {ordenColumna?.columna === 'id' && (
-                    <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+        <div className="lista-info tabla-acciones-superior">
+          <p>Total de cajas: {cajasFiltradas.length}</p>
+          <SelectorColumnas
+            columnas={CAJAS_COLUMNS}
+            visibleIds={visible}
+            onToggle={toggleColumn}
+            onRestaurar={() => setVisibleColumns(CAJAS_DEFAULT_VISIBLE)}
+          />
+        </div>
+
+        <div className="tabla-cajas-container">
+          <div className="tabla-wrapper">
+            <table className="tabla-cajas">
+              <thead>
+                <tr>
+                  {isVisible('id') && (
+                    <th className="sortable" onClick={() => handleOrdenar('id')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                      ID
+                      {ordenColumna?.columna === 'id' && (
+                        <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                      )}
+                    </th>
                   )}
-                </th>
-                <th
-                  className="sortable"
-                  onClick={() => handleOrdenar('nombre')}
-                  style={{ cursor: 'pointer', userSelect: 'none' }}
-                >
-                  Nombre
-                  {ordenColumna?.columna === 'nombre' && (
-                    <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                  {isVisible('nombre') && (
+                    <th className="sortable" onClick={() => handleOrdenar('nombre')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                      Nombre
+                      {ordenColumna?.columna === 'nombre' && (
+                        <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                      )}
+                    </th>
                   )}
-                </th>
-                <th
-                  className="sortable"
-                  onClick={() => handleOrdenar('descripcion')}
-                  style={{ cursor: 'pointer', userSelect: 'none' }}
-                >
-                  Descripción
-                  {ordenColumna?.columna === 'descripcion' && (
-                    <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                  {isVisible('descripcion') && (
+                    <th className="sortable" onClick={() => handleOrdenar('descripcion')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                      Descripción
+                      {ordenColumna?.columna === 'descripcion' && (
+                        <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                      )}
+                    </th>
                   )}
-                </th>
-                <th
-                  className="sortable"
-                  onClick={() => handleOrdenar('saldoActual')}
-                  style={{ cursor: 'pointer', userSelect: 'none' }}
-                >
-                  Saldo Actual
-                  {ordenColumna?.columna === 'saldoActual' && (
-                    <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                  {isVisible('saldoActual') && (
+                    <th className="sortable" onClick={() => handleOrdenar('saldoActual')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                      Saldo Actual
+                      {ordenColumna?.columna === 'saldoActual' && (
+                        <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                      )}
+                    </th>
                   )}
-                </th>
-                <th
-                  className="sortable"
-                  onClick={() => handleOrdenar('estado')}
-                  style={{ cursor: 'pointer', userSelect: 'none' }}
-                >
-                  Estado
-                  {ordenColumna?.columna === 'estado' && (
-                    <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                  {isVisible('estado') && (
+                    <th className="sortable" onClick={() => handleOrdenar('estado')} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                      Estado
+                      {ordenColumna?.columna === 'estado' && (
+                        <span className="sort-indicator">{ordenColumna.direccion === 'asc' ? ' ↑' : ' ↓'}</span>
+                      )}
+                    </th>
                   )}
-                </th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-            {cajas.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="sin-datos">
-                  No hay cajas registradas.
-                </td>
-              </tr>
-            ) : (
-              cajasOrdenadas.map((caja) => (
-                <tr key={caja.id}>
-                  <td>{caja.id}</td>
-                  <td>{caja.nombre}</td>
-                  <td>{caja.descripcion || '-'}</td>
-                  <td className={caja.saldoActual >= 0 ? 'saldo-positivo' : 'saldo-negativo'}>
-                    ${caja.saldoActual.toFixed(2)}
-                  </td>
-                    <td>
-                      <span className={`badge ${caja.activa ? 'badge-activo' : 'badge-inactivo'}`}>
-                        {caja.activa ? 'Activa' : 'Inactiva'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="acciones">
-                        <button
-                          onClick={() => handleVerResumen(caja)}
-                          className="btn-accion btn-resumen"
-                          title="Ver Resumen"
-                        >
-                          📊
-                        </button>
-                        <button
-                          onClick={() => handleModificar(caja)}
-                          className="btn-accion btn-modificar"
-                          title="Modificar"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          onClick={() => handleBorrar(caja.id)}
-                          className="btn-accion btn-borrar"
-                          title="Borrar"
-                        >
-                          🗑️
-                        </button>
-                      </div>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cajasOrdenadas.length === 0 ? (
+                  <tr>
+                    <td colSpan={visible.length + 1} className="sin-datos">
+                      {cajas.length === 0 ? 'No hay cajas registradas.' : 'No hay cajas que coincidan con los filtros.'}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  cajasOrdenadas.map((caja) => (
+                    <tr key={caja.id}>
+                      {isVisible('id') && <td>{caja.id}</td>}
+                      {isVisible('nombre') && <td>{caja.nombre}</td>}
+                      {isVisible('descripcion') && <td>{caja.descripcion || '-'}</td>}
+                      {isVisible('saldoActual') && (
+                        <td className={caja.saldoActual >= 0 ? 'saldo-positivo' : 'saldo-negativo'}>
+                          ${caja.saldoActual.toFixed(2)}
+                        </td>
+                      )}
+                      {isVisible('estado') && (
+                        <td>
+                          <span className={`badge ${caja.activa ? 'badge-activo' : 'badge-inactivo'}`}>
+                            {caja.activa ? 'Activa' : 'Inactiva'}
+                          </span>
+                        </td>
+                      )}
+                      <td>
+                        <div className="acciones">
+                          <button onClick={() => handleVerResumen(caja)} className="btn-accion btn-resumen" title="Ver Resumen">
+                            📊
+                          </button>
+                          <button onClick={() => handleModificar(caja)} className="btn-accion btn-modificar" title="Modificar">
+                            ✏️
+                          </button>
+                          <button onClick={() => handleBorrar(caja.id)} className="btn-accion btn-borrar" title="Borrar">
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
       {cajaResumen && (
@@ -470,6 +540,11 @@ const FormularioCaja = ({ caja, onSubmit, onCancel, error }: FormularioCajaProps
             />
             Caja activa
           </label>
+          {tieneMovimientos && caja && (
+            <div style={{ marginTop: '0.25rem', fontSize: '0.875rem', color: '#666' }}>
+              Podés desactivar la caja para que no se use en nuevos cobros o movimientos; el saldo se mantiene.
+            </div>
+          )}
         </div>
 
         {error && <div className="error-message">{error}</div>}

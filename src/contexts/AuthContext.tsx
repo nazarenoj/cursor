@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { apiService, setToken, removeToken } from '../services/api';
+import { apiService, getToken, setToken, removeToken } from '../services/api';
 
 interface AuthContextType {
   user: { id: number; usuario: string } | null;
@@ -17,12 +17,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const verificarSesion = async () => {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
+      if (!getToken()) {
         setLoading(false);
         return;
       }
-
       try {
         const userData = await apiService.verificarToken();
         setUser(userData);

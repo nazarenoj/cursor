@@ -1,37 +1,51 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocios } from '../hooks/useSocios';
 import { useCategorias } from '../hooks/useCategorias';
-import { useLiquidaciones } from '../hooks/useLiquidaciones';
 import { useClubConfig } from '../contexts/ClubConfigContext';
 import { usePermissions } from '../contexts/PermissionsContext';
+import { useFilterPreferences } from '../hooks/useFilterPreferences';
 import { FormularioSocio } from './FormularioSocio';
-import { FiltrosSocios } from './FiltrosSocios';
+import { FiltrosSocios, SOCIOS_FILTROS, SOCIOS_FILTROS_DEFAULT } from './FiltrosSocios';
+import { SelectorFiltros } from './SelectorFiltros';
 import { TablaSocios } from './TablaSocios';
 import { ImprimirSocios } from './ImprimirSocios';
 import { LiquidacionesSocio } from './LiquidacionesSocio';
-import { exportarSociosPdf, exportarSociosExcel } from '../utils/exportSociosPdf';
 import { apiService } from '../services/api';
-import type { Socio, FiltrosSocio, WhatsAppTemplate } from '../types';
+import type { Socio, FiltrosSocio, WhatsAppTemplate, WhatsAppBaileysBatchItem } from '../types';
+import { fileToBase64 } from '../utils/whatsappEnvio';
+import { columnaSociosASort, sortDesdeOrdenColumna } from '../utils/sociosOrdenListado';
+import { useWhatsAppBaileysStatus } from '../hooks/useWhatsAppBaileysStatus';
+import { WhatsAppServicioEstadoUI, WhatsAppServicioQrEnModal } from './WhatsAppServicioEstadoUI';
 import './ListaSocios.css';
+
+const EnviarWhatsApp = lazy(() =>
+  import('./EnviarWhatsApp').then((m) => ({ default: m.EnviarWhatsApp })),
+);
 
 export const ListaSocios = () => {
   const {
     socios,
+    meta,
+    loadSocios,
     agregarSocio,
     modificarSocio,
     darBajaSocio,
     darAltaSocio,
     borrarSocio,
-    listarSocios,
     obtenerProximoNumeroSocio,
     loading,
+    isFetching,
     error,
   } = useSocios();
   const { categorias } = useCategorias();
-  const { nombreClub } = useClubConfig();
-  const { listarLiquidaciones, liquidacionesMensuales } = useLiquidaciones();
+  const { nombreClub, whatsappUsarServicio } = useClubConfig();
+  const modoServicioBaileys = whatsappUsarServicio !== false;
   const { tienePermiso } = usePermissions();
+  const { visibleFilters, setVisibleFilters, toggleFilter } = useFilterPreferences(
+    'socios',
+    SOCIOS_FILTROS_DEFAULT,
+  );
   const navigate = useNavigate();
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [socioEditando, setSocioEditando] = useState<Socio | undefined>(undefined);
@@ -43,17 +57,36 @@ export const ListaSocios = () => {
   const [mensajeParaEnviar, setMensajeParaEnviar] = useState('');
   const [socioParaEnviar, setSocioParaEnviar] = useState<Socio | null>(null);
   const [archivoPdfAdjunto, setArchivoPdfAdjunto] = useState('');
+  const [pdfBaileysAdjunto, setPdfBaileysAdjunto] = useState<File | null>(null);
+  const [enviandoBaileys, setEnviandoBaileys] = useState(false);
+  const [sociosSeleccionados, setSociosSeleccionados] = useState<Set<number>>(new Set());
+  const [sociosParaPantalla, setSociosParaPantalla] = useState<Socio[] | null>(null);
+  const [tipoInicialPantalla, setTipoInicialPantalla] = useState<'liquidaciones' | 'generico'>('generico');
 
   // Plantillas WhatsApp (BD)
   const STORAGE_KEY_SELECTED_TEMPLATE = 'whatsapp_socios_template_selected_v1';
   const [plantillas, setPlantillas] = useState<WhatsAppTemplate[]>([]);
   const [plantillaSeleccionadaId, setPlantillaSeleccionadaId] = useState<number | ''>('');
 
+  const baileysPollingModal = mostrarModalMensaje && !!socioParaEnviar && modoServicioBaileys;
+  const { status: baileysStatusModal, refrescar: refrescarBaileysModal } =
+    useWhatsAppBaileysStatus(baileysPollingModal);
+
   const cargarPlantillas = async () => {
     const list = await apiService.getWhatsAppTemplates();
     setPlantillas(list);
     return list;
   };
+
+  useEffect(() => {
+    loadSocios(filtros, 1);
+  }, [loadSocios, JSON.stringify(filtros)]);
+
+  useEffect(() => {
+    if (mostrarModalMensaje && socioParaEnviar) {
+      setPdfBaileysAdjunto(null);
+    }
+  }, [mostrarModalMensaje, socioParaEnviar?.id]);
 
   useEffect(() => {
     (async () => {
@@ -145,46 +178,6 @@ export const ListaSocios = () => {
     }
   };
 
-  const sociosFiltrados = listarSocios(filtros);
-
-  // Aplicar ordenamiento (excluyendo la columna 'estado' que se usa para filtrar)
-  const sociosOrdenados = [...sociosFiltrados].sort((a, b) => {
-    if (!ordenColumna || ordenColumna.columna === 'estado') return 0;
-
-    const { columna, direccion } = ordenColumna;
-    let comparacion = 0;
-
-    switch (columna) {
-      case 'numeroSocio':
-        comparacion = a.numeroSocio - b.numeroSocio;
-        break;
-      case 'apellido':
-        comparacion = a.apellido.localeCompare(b.apellido);
-        break;
-      case 'nombre':
-        comparacion = a.nombre.localeCompare(b.nombre);
-        break;
-      case 'dni':
-        comparacion = (a.dni || '').localeCompare(b.dni || '');
-        break;
-      case 'telefono':
-        comparacion = (a.telefono || '').localeCompare(b.telefono || '');
-        break;
-      case 'email':
-        comparacion = (a.email || '').localeCompare(b.email || '');
-        break;
-      case 'categoria':
-        const categoriaA = categorias.find(c => c.id === a.categoriaId)?.nombre || '';
-        const categoriaB = categorias.find(c => c.id === b.categoriaId)?.nombre || '';
-        comparacion = categoriaA.localeCompare(categoriaB);
-        break;
-      default:
-        return 0;
-    }
-
-    return direccion === 'asc' ? comparacion : -comparacion;
-  });
-
   const handleOrdenar = (columna: string) => {
     if (columna === 'estado') {
       // Para la columna Estado, filtrar cíclicamente en lugar de ordenar
@@ -192,15 +185,14 @@ export const ListaSocios = () => {
       return;
     }
 
-    if (ordenColumna && ordenColumna.columna === columna) {
-      // Si ya está ordenada, cambiar dirección
-      setOrdenColumna({
-        columna,
-        direccion: ordenColumna.direccion === 'asc' ? 'desc' : 'asc',
-      });
-    } else {
-      // Nueva columna, ordenar ascendente por defecto
-      setOrdenColumna({ columna, direccion: 'asc' });
+    const next: { columna: string; direccion: 'asc' | 'desc' } =
+      ordenColumna && ordenColumna.columna === columna
+        ? { columna, direccion: ordenColumna.direccion === 'asc' ? 'desc' : 'asc' }
+        : { columna, direccion: 'asc' };
+    setOrdenColumna(next);
+    const sortBy = columnaSociosASort(next.columna);
+    if (sortBy) {
+      loadSocios(filtros, 1, { sortBy, sortDir: next.direccion });
     }
   };
 
@@ -303,10 +295,6 @@ export const ListaSocios = () => {
     setSocioEditando(undefined);
   };
 
-  const handleImprimir = () => {
-    setMostrarImpresion(true);
-  };
-
   const handleVerLiquidaciones = (socio: Socio) => {
     setSocioLiquidaciones(socio);
   };
@@ -319,111 +307,119 @@ export const ListaSocios = () => {
     navigate(`/pagos?socioId=${socio.id}`);
   };
 
-  const handleExportPdf = async () => {
+  const handleExportPdf = async (visibleColumnIds: string[]) => {
     try {
-      await exportarSociosPdf(sociosFiltrados, categorias, nombreClub);
+      const { exportarSociosPdf } = await import('../utils/exportSociosPdf');
+      const sort = sortDesdeOrdenColumna(ordenColumna);
+      const data = await apiService.getSociosTodasLasPaginas(filtros, sort);
+      await exportarSociosPdf(data, categorias, nombreClub, visibleColumnIds);
     } catch (error) {
       console.error(error);
       alert('No se pudo generar el PDF. Intentá nuevamente.');
     }
   };
 
-  const handleExportExcel = (visibleColumnIds: string[]) => {
+  const handleExportExcel = async (visibleColumnIds: string[]) => {
     try {
-      exportarSociosExcel(sociosFiltrados, categorias, visibleColumnIds);
+      const { exportarSociosExcel } = await import('../utils/exportSociosPdf');
+      const sort = sortDesdeOrdenColumna(ordenColumna);
+      const data = await apiService.getSociosTodasLasPaginas(filtros, sort);
+      exportarSociosExcel(data, categorias, visibleColumnIds);
     } catch (error) {
       console.error(error);
       alert('No se pudo generar el Excel. Intentá nuevamente.');
     }
   };
 
-  const generarMensajeLiquidaciones = (socio: Socio): string => {
-    // Obtener liquidaciones del socio
-    const cuotas = listarLiquidaciones().filter(l => l.socioId === socio.id);
-    
-    // Agregar información de mes y fecha de liquidación
-    const liquidaciones = cuotas.map(cuota => {
-      const liquidacionMensual = liquidacionesMensuales.find(lm => lm.id === cuota.liquidacionMensualId);
-      return {
-        ...cuota,
-        mes: liquidacionMensual?.mes || '',
-        fechaLiquidacion: liquidacionMensual?.fechaLiquidacion || '',
-      };
-    }).sort((a, b) => b.mes.localeCompare(a.mes));
-
-    // Separar liquidaciones pendientes y pagadas
-    const pendientes = liquidaciones.filter(l => !l.pagado);
-    const pagadas = liquidaciones.filter(l => l.pagado).slice(-6); // Últimos 6 meses
-
-    // Construir mensaje
-    let mensaje = `*${nombreClub}*\n\n`;
-    mensaje += `Hola ${socio.nombre} ${socio.apellido},\n\n`;
-    mensaje += `Te enviamos el detalle de tus liquidaciones:\n\n`;
-
-    if (pendientes.length > 0) {
-      mensaje += `*📋 Liquidaciones Pendientes:*\n`;
-      pendientes.forEach(l => {
-        const [año, mes] = l.mes.split('-');
-        const fecha = new Date(parseInt(año), parseInt(mes) - 1, 1);
-        const nombreMes = fecha.toLocaleString('es-AR', { month: 'long', year: 'numeric' });
-        mensaje += `• ${nombreMes}: $${l.monto.toFixed(2)}\n`;
-      });
-      mensaje += `\n*Total Pendiente: $${pendientes.reduce((sum, l) => sum + l.monto, 0).toFixed(2)}*\n\n`;
-    }
-
-    if (pagadas.length > 0) {
-      mensaje += `*✅ Liquidaciones Pagadas (últimos 6 meses):*\n`;
-      pagadas.forEach(l => {
-        const [año, mes] = l.mes.split('-');
-        const fecha = new Date(parseInt(año), parseInt(mes) - 1, 1);
-        const nombreMes = fecha.toLocaleString('es-AR', { month: 'long', year: 'numeric' });
-        mensaje += `• ${nombreMes}: $${l.monto.toFixed(2)}`;
-        if (l.fechaPago) {
-          const fechaPago = new Date(l.fechaPago);
-          mensaje += ` (Pagado: ${fechaPago.toLocaleDateString('es-AR')})`;
-        }
-        mensaje += `\n`;
-      });
-      mensaje += `\n`;
-    }
-
-    if (pendientes.length === 0 && pagadas.length === 0) {
-      mensaje += `No tienes liquidaciones registradas.\n\n`;
-    }
-
-    if (pendientes.length > 0) {
-      mensaje += `Por favor, acércate a la secretaría para regularizar tus pagos pendientes.\n\n`;
-    }
-
-    mensaje += `Saludos cordiales,\n${nombreClub}`;
-
-    return mensaje;
+  const handleEnviarLiquidacionesWhatsApp = (socio: Socio) => {
+    setTipoInicialPantalla('liquidaciones');
+    setSociosParaPantalla([socio]);
   };
 
-  const handleEnviarLiquidacionesWhatsApp = (socio: Socio) => {
-    if (!socio.telefono) {
-      alert('Este socio no tiene teléfono registrado.');
+  const aplicarVariablesSocio = (texto: string, socio: Socio, liquidacion?: { mes: string; monto: number }): string => {
+    const cat = categorias.find((c) => c.id === socio.categoriaId);
+    const [año, mes] = (liquidacion?.mes || '').split('-');
+    const nombreMes = año && mes
+      ? new Date(parseInt(año), parseInt(mes) - 1, 1).toLocaleString('es-AR', { month: 'long', year: 'numeric' })
+      : '';
+    return texto
+      .replace(/{nombre}/g, socio.nombre || '')
+      .replace(/{apellido}/g, socio.apellido || '')
+      .replace(/{numeroSocio}/g, String(socio.numeroSocio))
+      .replace(/{categoria}/g, cat?.nombre || '')
+      .replace(/{mes}/g, nombreMes)
+      .replace(/{monto}/g, liquidacion ? liquidacion.monto.toFixed(2) : '0.00');
+  };
+
+  const cerrarModalWhatsApp = () => {
+    setMostrarModalMensaje(false);
+    setSocioParaEnviar(null);
+    setMensajeParaEnviar('');
+    setArchivoPdfAdjunto('');
+    setPdfBaileysAdjunto(null);
+  };
+
+  const confirmarEnvioWhatsApp = async () => {
+    if (!socioParaEnviar?.telefono) return;
+
+    const mensajeFinal = aplicarVariablesSocio(mensajeParaEnviar, socioParaEnviar);
+
+    if (modoServicioBaileys) {
+      setEnviandoBaileys(true);
+      try {
+        let status;
+        try {
+          status = await apiService.getWhatsAppBaileysStatus();
+        } catch {
+          alert('No se pudo consultar el servicio WhatsApp. ¿Está el backend y whatsapp-service en ejecución?');
+          return;
+        }
+        if (!status.reachable) {
+          alert(
+            status.serviceError ||
+              'No se alcanza el servicio Baileys. Revisá WHATSAPP_SERVICE_URL y ejecutá npm run dev:whatsapp.',
+          );
+          return;
+        }
+        if (!status.connected) {
+          alert(
+            'WhatsApp no está conectado. Escaneá el código QR que aparece abajo en este modal (o pulsá «Actualizar estado / QR»).',
+          );
+          return;
+        }
+        let documentBase64: string | undefined;
+        let fileName: string | undefined;
+        if (pdfBaileysAdjunto) {
+          documentBase64 = await fileToBase64(pdfBaileysAdjunto);
+          fileName = pdfBaileysAdjunto.name || 'adjunto.pdf';
+        }
+        const items: WhatsAppBaileysBatchItem[] = [
+          {
+            phone: socioParaEnviar.telefono,
+            caption: mensajeFinal,
+            documentBase64,
+            fileName,
+          },
+        ];
+        const data = await apiService.sendWhatsAppBaileysBatch(items);
+        const failed = data.results.filter((r) => !r.success);
+        if (failed.length) {
+          alert(failed.map((f) => f.error || '?').join('; '));
+        } else {
+          alert('Mensaje encolado en el servicio WhatsApp (Baileys).');
+        }
+        cerrarModalWhatsApp();
+      } catch (e) {
+        alert(e instanceof Error ? e.message : 'Error al enviar');
+      } finally {
+        setEnviandoBaileys(false);
+      }
       return;
     }
 
-    const mensaje =
-      plantillaSeleccionadaId
-        ? (plantillas.find((p) => p.id === plantillaSeleccionadaId)?.texto ?? generarMensajeLiquidaciones(socio))
-        : generarMensajeLiquidaciones(socio);
-    setMensajeParaEnviar(mensaje);
-    setSocioParaEnviar(socio);
-    setMostrarModalMensaje(true);
-  };
-
-  const confirmarEnvioWhatsApp = () => {
-    if (!socioParaEnviar) return;
-
-    // Formatear teléfono para WhatsApp (solo dígitos, con prefijo 54)
     const telefonoLimpio = socioParaEnviar.telefono.replace(/\D/g, '');
     const telefonoWhatsApp = telefonoLimpio.startsWith('54') ? telefonoLimpio : `54${telefonoLimpio}`;
-
-    // Abrir WhatsApp
-    const url = `https://wa.me/${telefonoWhatsApp}?text=${encodeURIComponent(mensajeParaEnviar)}`;
+    const url = `https://wa.me/${telefonoWhatsApp}?text=${encodeURIComponent(mensajeFinal)}`;
     window.open(url, '_blank');
 
     if (archivoPdfAdjunto.trim()) {
@@ -431,11 +427,21 @@ export const ListaSocios = () => {
         alert(`Recordá adjuntar el PDF en el chat de WhatsApp:\n${archivoPdfAdjunto.trim()}`);
       }, 300);
     }
-    setMostrarModalMensaje(false);
-    setSocioParaEnviar(null);
-    setMensajeParaEnviar('');
-    setArchivoPdfAdjunto('');
+    cerrarModalWhatsApp();
   };
+
+  if (sociosParaPantalla) {
+    return (
+      <Suspense fallback={<div className="lista-socios"><p>Cargando mensajes...</p></div>}>
+        <EnviarWhatsApp
+          sociosPreseleccionados={sociosParaPantalla}
+          sociosFijos
+          tipoInicial={tipoInicialPantalla}
+          onVolver={() => setSociosParaPantalla(null)}
+        />
+      </Suspense>
+    );
+  }
 
   if (socioLiquidaciones) {
     return (
@@ -451,7 +457,7 @@ export const ListaSocios = () => {
   if (mostrarImpresion) {
     return (
       <ImprimirSocios
-        socios={sociosFiltrados}
+        socios={socios}
         categorias={categorias}
         filtros={filtros}
         onVolver={() => setMostrarImpresion(false)}
@@ -459,7 +465,7 @@ export const ListaSocios = () => {
     );
   }
 
-  if (loading) {
+  if (loading && socios.length === 0) {
     return (
       <div className="lista-socios">
         <p>Cargando socios...</p>
@@ -477,7 +483,7 @@ export const ListaSocios = () => {
 
   if (mostrarFormulario) {
     return (
-      <div className="lista-socios">
+      <div className="lista-socios lista-socios-formulario">
         <FormularioSocio
           socio={socioEditando}
           numeroSocioSugerido={
@@ -494,18 +500,52 @@ export const ListaSocios = () => {
     <div className="lista-socios">
       <div className="lista-header">
         <h1>Gestión de Socios</h1>
-        <span className="lista-total">Total de socios: {sociosOrdenados.length}</span>
+        <span className="lista-total">Total de socios: {meta.total}</span>
+        {isFetching && <span className="lista-cargando-inline">Actualizando...</span>}
+        {meta.pages > 1 && (
+          <div className="lista-paginacion">
+            <span>Página {meta.currentPage} de {meta.pages}</span>
+            <button
+              type="button"
+              className="btn-pag"
+              disabled={meta.currentPage <= 1}
+              onClick={() => loadSocios(filtros, meta.currentPage - 1)}
+            >
+              Anterior
+            </button>
+            <button
+              type="button"
+              className="btn-pag"
+              disabled={meta.currentPage >= meta.pages}
+              onClick={() => loadSocios(filtros, meta.currentPage + 1)}
+            >
+              Siguiente
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="lista-socios-card">
-        <FiltrosSocios
-          filtros={filtros}
-          categorias={categorias}
-          onChange={setFiltros}
-        />
-
         <TablaSocios
-        socios={sociosOrdenados}
+          filtros={
+            <FiltrosSocios
+              filtros={filtros}
+              categorias={categorias}
+              onChange={setFiltros}
+              visibleFilters={visibleFilters}
+              toggleFilter={toggleFilter}
+            />
+          }
+          selectorFiltros={
+            <SelectorFiltros
+              filtros={SOCIOS_FILTROS}
+              visibleIds={visibleFilters}
+              onToggle={toggleFilter}
+              onRestaurar={() => setVisibleFilters(SOCIOS_FILTROS_DEFAULT)}
+              titulo="Filtros visibles"
+            />
+          }
+        socios={socios}
         categorias={categorias}
         onModificar={handleModificar}
         onDarBaja={handleDarBaja}
@@ -520,8 +560,23 @@ export const ListaSocios = () => {
         ordenColumna={ordenColumna}
         onOrdenar={handleOrdenar}
         filtroEstado={filtros.activo}
-      />
-
+        seleccionados={sociosSeleccionados}
+        onToggleSeleccion={(id) => {
+          setSociosSeleccionados((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+          });
+        }}
+        onSeleccionarTodos={() => setSociosSeleccionados(new Set(socios.map((s) => s.id)))}
+        onDeseleccionarTodos={() => setSociosSeleccionados(new Set())}
+        onEnvioMasivo={tienePermiso('socios.whatsapp') ? () => {
+          const seleccionados = socios.filter((s) => sociosSeleccionados.has(s.id));
+          setTipoInicialPantalla('generico');
+          setSociosParaPantalla(seleccionados.length > 0 ? seleccionados : socios);
+        } : undefined}
+        />
       </div>
 
       {/* Modal para mostrar y editar mensaje antes de enviar */}
@@ -546,15 +601,35 @@ export const ListaSocios = () => {
             </div>
 
             <div className="modal-mensaje-editor">
-              <label htmlFor="archivo-pdf-adjunto-socio">Archivo PDF a adjuntar (recordatorio, opcional)</label>
-              <input
-                id="archivo-pdf-adjunto-socio"
-                type="text"
-                value={archivoPdfAdjunto}
-                onChange={(e) => setArchivoPdfAdjunto(e.target.value)}
-                placeholder="Ej: Resumen Juan Pérez.pdf"
-                className="input-archivo-adjunto"
+              <WhatsAppServicioEstadoUI
+                modoServicioBaileys={modoServicioBaileys}
+                status={baileysStatusModal}
+                onRefresh={refrescarBaileysModal}
+                variant="compact"
               />
+              {modoServicioBaileys && (
+                <label className="lista-socios-baileys-file">
+                  PDF opcional
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={(e) => setPdfBaileysAdjunto(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+              )}
+              {!modoServicioBaileys && (
+                <>
+                  <label htmlFor="archivo-pdf-adjunto-socio">Archivo PDF a adjuntar (recordatorio, opcional)</label>
+                  <input
+                    id="archivo-pdf-adjunto-socio"
+                    type="text"
+                    value={archivoPdfAdjunto}
+                    onChange={(e) => setArchivoPdfAdjunto(e.target.value)}
+                    placeholder="Ej: Resumen Juan Pérez.pdf"
+                    className="input-archivo-adjunto"
+                  />
+                </>
+              )}
               <label>Plantillas guardadas</label>
               <div className="whatsapp-plantillas-row">
                 <select
@@ -590,7 +665,11 @@ export const ListaSocios = () => {
                 </button>
               </div>
 
-              <label htmlFor="mensaje-editable-socio">Mensaje a enviar:</label>
+              <div className="variables-ayuda-socios">
+                <strong>Variables: </strong>
+                <code>{'{nombre}'}</code>, <code>{'{apellido}'}</code>, <code>{'{numeroSocio}'}</code>, <code>{'{categoria}'}</code>, <code>{'{mes}'}</code>, <code>{'{monto}'}</code>
+              </div>
+              <label htmlFor="mensaje-editable-socio">Mensaje a enviar (con variables se reemplazan al enviar):</label>
               <textarea
                 id="mensaje-editable-socio"
                 value={mensajeParaEnviar}
@@ -599,6 +678,12 @@ export const ListaSocios = () => {
                 className="textarea-mensaje-editable"
               />
             </div>
+
+            <WhatsAppServicioQrEnModal
+              modoServicioBaileys={modoServicioBaileys}
+              status={baileysStatusModal}
+              onRefresh={refrescarBaileysModal}
+            />
 
             <div className="modal-mensaje-acciones">
               <button
@@ -614,9 +699,14 @@ export const ListaSocios = () => {
               </button>
               <button
                 className="btn-confirmar-envio"
-                onClick={confirmarEnvioWhatsApp}
+                onClick={() => void confirmarEnvioWhatsApp()}
+                disabled={enviandoBaileys}
               >
-                📱 Enviar por WhatsApp
+                {enviandoBaileys
+                  ? 'Enviando…'
+                  : modoServicioBaileys
+                    ? '📱 Enviar (servicio)'
+                    : '📱 Enviar por WhatsApp Web'}
               </button>
             </div>
           </div>
